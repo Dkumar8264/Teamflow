@@ -176,6 +176,94 @@ Building real-time project management UI with React + Redux
 6. PropTypes validation
 ```
 
+## Example: Ask AI for Phase 1
+
+Use this prompt when you want to generate or regenerate the complete backend authentication phase.
+
+```markdown
+# PHASE 1: Backend Setup & Authentication
+
+I'm building TeamFlow, a project management app. Here's the complete system design:
+
+[Reference documents]
+- ARCHITECTURE.md
+- DATABASE_SCHEMA.md (User collection)
+- API_SPECIFICATION.md (auth endpoints)
+
+## Phase 1 Deliverables
+Build a complete authentication module with:
+
+### Database
+- User model with: name, email, password (hashed), profilePicture, role, createdAt
+
+### API Endpoints
+POST   /api/auth/signup
+POST   /api/auth/login
+POST   /api/auth/refresh-token
+POST   /api/auth/logout
+GET    /api/auth/me
+
+## Requirements
+
+### Signup
+- Accept: name, email, password
+- Validate: email unique, password 8+ chars
+- Hash password with bcrypt
+- Return: token (JWT) + user data
+
+### Login
+- Accept: email, password
+- Verify password
+- Return: accessToken (7d expiry) + refreshToken (30d expiry)
+
+### JWT Middleware
+- Verify token on protected routes
+- Extract userId from token
+- Return 401 if invalid
+
+## Files to Create
+
+backend/
+  src/
+    config/
+      database.js
+      constants.js
+    models/
+      User.js
+    controllers/
+      authController.js
+    routes/
+      auth.js
+    middleware/
+      auth.js
+      validation.js
+      errorHandler.js
+    utils/
+      tokenGenerator.js
+      validators.js
+    app.js
+  server.js
+  .env.example
+  package.json
+
+## Dependencies
+- express
+- mongoose
+- jsonwebtoken
+- bcryptjs
+- dotenv
+- joi
+
+## Code Requirements
+- Production-ready code
+- Comprehensive error handling
+- Input validation with Joi schemas
+- JSDoc comments
+- Proper async/await
+- Consistent error response format
+- Rate limiting ready structure in place
+```
+
 ## Recommended Workflow
 
 1. Copy the phase build prompt template.
@@ -183,4 +271,3 @@ Building real-time project management UI with React + Redux
 3. Ask AI to generate only one module at a time when the phase is large.
 4. Review the generated code before adding the next module.
 5. Run local tests and API checks before moving to the next phase.
-
