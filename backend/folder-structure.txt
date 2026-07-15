@@ -31,6 +31,11 @@ backend/
       tasks.js
       comments.js
       notifications.js
+    services/
+      authService.js
+      workspaceService.js
+      projectService.js
+      taskService.js
     utils/
       AppError.js
       asyncHandler.js
