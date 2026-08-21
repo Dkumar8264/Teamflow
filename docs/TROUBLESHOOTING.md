@@ -37,6 +37,21 @@ CLIENT_URL=http://localhost:5173
 
 For multiple allowed origins, separate them with commas.
 
+## Vercel Shows "Failed to fetch"
+
+This usually means the deployed frontend is trying to call the local backend URL:
+
+```env
+http://127.0.0.1:5000/api
+```
+
+That URL only works on your laptop. For deployment:
+
+- Deploy the backend to a Node host such as Render, Railway, or Fly.io.
+- Set `VITE_API_URL=https://your-backend-domain.com/api` in the Vercel frontend project.
+- Set `CLIENT_URL=https://your-vercel-app.vercel.app` in the backend host.
+- Redeploy the frontend after changing `VITE_API_URL`.
+
 ## npm Audit Warnings
 
 Run:
@@ -47,4 +62,3 @@ npm audit
 ```
 
 Review changes before running `npm audit fix`, because it may update dependency versions.
-

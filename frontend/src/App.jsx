@@ -33,14 +33,21 @@ const apiRequest = async (path, { body, method = 'GET', token } = {}) => {
     throw new Error('Please log in again');
   }
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
+  let response;
+
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  } catch (error) {
+    throw new Error('API server is not reachable. Check VITE_API_URL in your frontend deployment.');
+  }
+
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok || payload.success === false) {
