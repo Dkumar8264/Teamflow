@@ -7,6 +7,8 @@ const { errorHandler, notFound } = require('./src/middleware/errorHandler');
 const AppError = require('./src/utils/AppError');
 const authRoutes = require('./src/routes/auth');
 const invitationRoutes = require('./src/routes/invitations');
+const projectRoutes = require('./src/routes/projects');
+const taskRoutes = require('./src/routes/tasks');
 
 dotenv.config();
 
@@ -47,7 +49,7 @@ const requestLogger = (req, res, next) => {
 };
 
 const parseAllowedOrigins = () =>
-  String(process.env.CLIENT_URL || 'http://localhost:5173')
+  String(process.env.CLIENT_URL || 'http://localhost:5173,http://127.0.0.1:5173')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -82,6 +84,8 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/invitations', invitationRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/tasks', taskRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

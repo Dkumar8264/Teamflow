@@ -1,65 +1,16 @@
 import React from 'react';
 import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 
-const initialProjects = [
-  {
-    id: 1,
-    name: 'TeamFlow MVP',
-    owner: 'Deepak',
-    progress: 68,
-    team: [
-      { id: 1, name: 'Deepak', email: 'deepak@example.com' },
-      { id: 2, name: 'Avery', email: 'avery@example.com' },
-      { id: 3, name: 'Maya', email: 'maya@example.com' }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Authentication',
-    owner: 'Deepak',
-    progress: 80,
-    team: [{ id: 4, name: 'Deepak', email: 'deepak@example.com' }]
-  },
-  {
-    id: 3,
-    name: 'Real-time Board',
-    owner: 'Deepak',
-    progress: 42,
-    team: [{ id: 5, name: 'Deepak', email: 'deepak@example.com' }]
-  }
-];
-
-const initialColumns = [
-  {
-    id: 'todo',
-    title: 'TO DO',
-    tasks: [
-      { id: 1, title: 'Create project schema', project: 'TeamFlow MVP' },
-      { id: 2, title: 'Design signup page', project: 'Authentication' }
-    ]
-  },
-  {
-    id: 'progress',
-    title: 'IN PROGRESS',
-    tasks: [
-      { id: 3, title: 'Build dashboard UI', project: 'TeamFlow MVP' },
-      { id: 4, title: 'Wire task routes', project: 'Real-time Board' }
-    ]
-  },
-  {
-    id: 'review',
-    title: 'REVIEW',
-    tasks: [{ id: 5, title: 'Test auth middleware', project: 'Authentication' }]
-  },
-  {
-    id: 'done',
-    title: 'DONE',
-    tasks: [{ id: 6, title: 'Backend health route', project: 'TeamFlow MVP' }]
-  }
-];
-
 const features = ['Projects', 'Team roles', 'Kanban tasks', 'Comments', 'Notifications', 'Real-time sync'];
 const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api';
+const authStorageKey = 'teamflow_auth';
+
+const columnDefinitions = [
+  { id: 'todo', title: 'TO DO' },
+  { id: 'in_progress', title: 'IN PROGRESS' },
+  { id: 'review', title: 'REVIEW' },
+  { id: 'done', title: 'DONE' }
+];
 
 const initialRoadmap = [
   { id: 1, title: 'Auth setup', timeline: 'Week 1-2', status: 'DONE' },
@@ -69,29 +20,90 @@ const initialRoadmap = [
   { id: 5, title: 'Polish and deploy', timeline: 'Week 6-8', status: 'PLANNED' }
 ];
 
+const getErrorMessage = (payload, fallback) => {
+  if (payload?.errors?.length > 0) {
+    return payload.errors.join(', ');
+  }
+
+  return payload?.message || fallback;
+};
+
+const apiRequest = async (path, { body, method = 'GET', token } = {}) => {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.success === false) {
+    throw new Error(getErrorMessage(payload, 'Request failed'));
+  }
+
+  return payload;
+};
+
+const getDocumentId = (item) => item?._id || item?.id;
+
+const getProjectProgress = (projectId, tasks) => {
+  const projectTasks = tasks.filter((task) => getDocumentId(task.project) === projectId || task.project === projectId);
+
+  if (projectTasks.length === 0) {
+    return 0;
+  }
+
+  const doneTasks = projectTasks.filter((task) => task.status === 'done').length;
+  return Math.round((doneTasks / projectTasks.length) * 100);
+};
+
+const normalizeMember = (member) => ({
+  id: getDocumentId(member),
+  name: member.name,
+  email: member.email,
+  role: member.role
+});
+
+const normalizeProject = (project, tasks = []) => ({
+  id: getDocumentId(project),
+  name: project.name,
+  description: project.description || '',
+  owner: project.members?.find((member) => member.role === 'owner')?.name || project.owner?.name || 'Owner',
+  progress: getProjectProgress(getDocumentId(project), tasks),
+  team: project.team || (project.members || []).map(normalizeMember)
+});
+
+const normalizeTask = (task) => ({
+  id: getDocumentId(task),
+  title: task.title,
+  project: task.project?.name || task.projectName || 'Project',
+  projectId: getDocumentId(task.project) || task.project,
+  status: task.status || 'todo'
+});
+
+const buildColumns = (tasks) =>
+  columnDefinitions.map((column) => ({
+    ...column,
+    tasks: tasks.filter((task) => task.status === column.id).map(normalizeTask)
+  }));
+
 function App() {
-  const [registeredUser, setRegisteredUser] = React.useState(() => {
-    const storedUser = window.localStorage.getItem('teamflow_registered_user');
-    return storedUser ? JSON.parse(storedUser) : null;
+  const [auth, setAuth] = React.useState(() => {
+    const storedAuth = window.localStorage.getItem(authStorageKey);
+    return storedAuth ? JSON.parse(storedAuth) : null;
   });
-  const [currentUser, setCurrentUser] = React.useState(() => {
-    const storedUser = window.localStorage.getItem('teamflow_current_user');
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
-  const [projects, setProjects] = React.useState(initialProjects);
-  const [columns, setColumns] = React.useState(initialColumns);
-  const [invitations, setInvitations] = React.useState([
-    {
-      id: 1,
-      name: 'Avery',
-      email: 'avery@example.com',
-      project: 'TeamFlow MVP',
-      message: 'You got an invitation to join TeamFlow MVP on TeamFlow.'
-    }
-  ]);
+  const [projects, setProjects] = React.useState([]);
+  const [tasks, setTasks] = React.useState([]);
+  const [columns, setColumns] = React.useState(buildColumns([]));
+  const [invitations, setInvitations] = React.useState([]);
   const [roadmap, setRoadmap] = React.useState(initialRoadmap);
-  const [activeProjectId, setActiveProjectId] = React.useState(1);
+  const [activeProjectId, setActiveProjectId] = React.useState(null);
   const [toast, setToast] = React.useState('SYSTEM ONLINE');
+  const [isLoading, setIsLoading] = React.useState(false);
+  const currentUser = auth?.user || null;
+  const token = auth?.token || '';
 
   const activeProject = projects.find((project) => project.id === activeProjectId) || projects[0];
 
@@ -103,57 +115,120 @@ function App() {
 
   const showToast = (message) => setToast(message.toUpperCase());
 
-  const signup = ({ name, email, password }) => {
-    const user = { name, email, password };
-    setRegisteredUser(user);
-    setCurrentUser(user);
-    window.localStorage.setItem('teamflow_registered_user', JSON.stringify(user));
-    window.localStorage.setItem('teamflow_current_user', JSON.stringify(user));
-    showToast(`Welcome ${name}`);
+  const loadWorkspace = React.useCallback(async (authToken = token) => {
+    if (!authToken) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const [projectsPayload, tasksPayload] = await Promise.all([
+        apiRequest('/projects', { token: authToken }),
+        apiRequest('/tasks', { token: authToken })
+      ]);
+      const nextTasks = tasksPayload.tasks || [];
+      const nextProjects = (projectsPayload.projects || []).map((project) => normalizeProject(project, nextTasks));
+
+      setTasks(nextTasks);
+      setColumns(buildColumns(nextTasks));
+      setProjects(nextProjects);
+      setActiveProjectId((current) => current || nextProjects[0]?.id || null);
+      showToast('Workspace synced');
+    } catch (error) {
+      showToast(error.message || 'Workspace sync failed');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  React.useEffect(() => {
+    if (token) {
+      loadWorkspace(token);
+    }
+  }, [loadWorkspace, token]);
+
+  const saveAuth = (payload) => {
+    const nextAuth = {
+      token: payload.token,
+      refreshToken: payload.refreshToken,
+      user: payload.user
+    };
+
+    setAuth(nextAuth);
+    window.localStorage.setItem(authStorageKey, JSON.stringify(nextAuth));
+    return nextAuth;
   };
 
-  const login = ({ email, password }) => {
-    if (!registeredUser) {
-      return { ok: false, message: 'Create an account first' };
-    }
+  const signup = async ({ name, email, password }) => {
+    const payload = await apiRequest('/auth/signup', {
+      method: 'POST',
+      body: { name, email, password }
+    });
+    const nextAuth = saveAuth(payload);
 
-    if (registeredUser.email !== email || registeredUser.password !== password) {
-      return { ok: false, message: 'Invalid email or password' };
-    }
+    showToast(`Welcome ${payload.user.name}`);
+    await loadWorkspace(nextAuth.token);
+    return { ok: true };
+  };
 
-    setCurrentUser(registeredUser);
-    window.localStorage.setItem('teamflow_current_user', JSON.stringify(registeredUser));
-    showToast(`Welcome back ${registeredUser.name}`);
+  const login = async ({ email, password }) => {
+    const payload = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: { email, password }
+    });
+    const nextAuth = saveAuth(payload);
+
+    showToast(`Welcome back ${payload.user.name}`);
+    await loadWorkspace(nextAuth.token);
     return { ok: true };
   };
 
   const logout = () => {
-    setCurrentUser(null);
-    window.localStorage.removeItem('teamflow_current_user');
+    setAuth(null);
+    setProjects([]);
+    setTasks([]);
+    setColumns(buildColumns([]));
+    setActiveProjectId(null);
+    window.localStorage.removeItem(authStorageKey);
     showToast('Logged out');
   };
 
-  const addProject = ({ name, owner }) => {
-    const project = {
-      id: Date.now(),
-      name,
-      owner,
-      progress: 0,
-      team: [{ id: Date.now() + 1, name: owner, email: `${owner.toLowerCase().replace(/\s+/g, '.')}@example.com` }]
-    };
+  const addProject = async ({ name, description }) => {
+    try {
+      const payload = await apiRequest('/projects', {
+        method: 'POST',
+        token,
+        body: { name, description }
+      });
+      const project = normalizeProject(payload.project, tasks);
 
-    setProjects((current) => [project, ...current]);
-    setActiveProjectId(project.id);
-    showToast(`${name} created`);
+      setProjects((current) => [project, ...current]);
+      setActiveProjectId(project.id);
+      showToast(`${name} created`);
+      return true;
+    } catch (error) {
+      showToast(error.message || 'Project create failed');
+      return false;
+    }
   };
 
-  const deleteProject = (projectId) => {
+  const deleteProject = async (projectId) => {
     const project = projects.find((item) => item.id === projectId);
-    const nextProjects = projects.filter((item) => item.id !== projectId);
 
-    setProjects(nextProjects);
-    setActiveProjectId(nextProjects[0]?.id || null);
-    showToast(`${project?.name || 'Project'} deleted`);
+    try {
+      await apiRequest(`/projects/${projectId}`, { method: 'DELETE', token });
+      const nextProjects = projects.filter((item) => item.id !== projectId);
+      const nextTasks = tasks.filter((task) => getDocumentId(task.project) !== projectId && task.project !== projectId);
+
+      setTasks(nextTasks);
+      setColumns(buildColumns(nextTasks));
+      setProjects(nextProjects);
+      setActiveProjectId(nextProjects[0]?.id || null);
+      showToast(`${project?.name || 'Project'} deleted`);
+    } catch (error) {
+      showToast(error.message || 'Project delete failed');
+    }
   };
 
   const inviteMember = async ({ projectId = activeProjectId, name, email }) => {
@@ -190,6 +265,21 @@ function App() {
       return false;
     }
 
+    try {
+      const memberPayload = await apiRequest(`/projects/${projectId}/members`, {
+        method: 'POST',
+        token,
+        body: { name, email }
+      });
+
+      setProjects((current) =>
+        current.map((item) => (item.id === projectId ? normalizeProject(memberPayload.project, tasks) : item))
+      );
+    } catch (error) {
+      showToast(error.message || 'Member add failed');
+      return false;
+    }
+
     const invitation = {
       id: Date.now(),
       name,
@@ -199,51 +289,74 @@ function App() {
       emailMode: emailResult.email.mode
     };
 
-    setProjects((current) =>
-      current.map((item) =>
-        item.id === projectId ? { ...item, team: [{ id: Date.now(), name, email }, ...item.team] } : item
-      )
-    );
     setInvitations((current) => [invitation, ...current]);
     showToast(emailResult.message);
     return true;
   };
 
-  const deleteMember = (projectId, memberId) => {
+  const deleteMember = async (projectId, memberId) => {
     const project = projects.find((item) => item.id === projectId);
     const member = project?.team.find((item) => item.id === memberId);
 
-    setProjects((current) =>
-      current.map((item) =>
-        item.id === projectId ? { ...item, team: item.team.filter((teamMember) => teamMember.id !== memberId) } : item
-      )
-    );
-    showToast(`${member?.name || 'Member'} removed`);
+    try {
+      const payload = await apiRequest(`/projects/${projectId}/members/${memberId}`, {
+        method: 'DELETE',
+        token
+      });
+
+      setProjects((current) =>
+        current.map((item) => (item.id === projectId ? normalizeProject(payload.project, tasks) : item))
+      );
+      showToast(`${member?.name || 'Member'} removed`);
+    } catch (error) {
+      showToast(error.message || 'Member remove failed');
+    }
   };
 
-  const addTask = ({ title }) => {
-    const task = { id: Date.now(), title, project: activeProject.name };
-    setColumns((current) =>
-      current.map((column) => (column.id === 'todo' ? { ...column, tasks: [task, ...column.tasks] } : column))
-    );
-    showToast(`${title} added`);
+  const addTask = async ({ title }) => {
+    if (!activeProject) {
+      showToast('Create a project first');
+      return false;
+    }
+
+    try {
+      const payload = await apiRequest('/tasks', {
+        method: 'POST',
+        token,
+        body: { title, projectId: activeProject.id, status: 'todo' }
+      });
+      const nextTasks = [payload.task, ...tasks];
+
+      setTasks(nextTasks);
+      setColumns(buildColumns(nextTasks));
+      setProjects((current) => current.map((project) => normalizeProject(project, nextTasks)));
+      showToast(`${title} added`);
+      return true;
+    } catch (error) {
+      showToast(error.message || 'Task add failed');
+      return false;
+    }
   };
 
-  const deleteTask = (taskId) => {
+  const deleteTask = async (taskId) => {
     let taskTitle = 'Task';
+    const task = tasks.find((item) => getDocumentId(item) === taskId);
 
-    setColumns((current) =>
-      current.map((column) => {
-        const task = column.tasks.find((item) => item.id === taskId);
+    if (task) {
+      taskTitle = task.title;
+    }
 
-        if (task) {
-          taskTitle = task.title;
-        }
+    try {
+      await apiRequest(`/tasks/${taskId}`, { method: 'DELETE', token });
+      const nextTasks = tasks.filter((item) => getDocumentId(item) !== taskId);
 
-        return { ...column, tasks: column.tasks.filter((item) => item.id !== taskId) };
-      })
-    );
-    showToast(`${taskTitle} deleted`);
+      setTasks(nextTasks);
+      setColumns(buildColumns(nextTasks));
+      setProjects((current) => current.map((project) => normalizeProject(project, nextTasks)));
+      showToast(`${taskTitle} deleted`);
+    } catch (error) {
+      showToast(error.message || 'Task delete failed');
+    }
   };
 
   const addRoadmapItem = ({ title, timeline, status }) => {
@@ -265,7 +378,7 @@ function App() {
     showToast(`${item?.title || 'Roadmap item'} deleted`);
   };
 
-  const moveTaskToColumn = (taskId, targetColumnId) => {
+  const moveTaskToColumn = async (taskId, targetColumnId) => {
     const columnIndex = columns.findIndex((column) => column.tasks.some((task) => task.id === taskId));
     const targetIndex = columns.findIndex((column) => column.id === targetColumnId);
 
@@ -277,32 +390,31 @@ function App() {
       return;
     }
 
-    const task = columns[columnIndex].tasks.find((item) => item.id === taskId);
-    const nextColumns = columns.map((column, index) => {
-      if (index === columnIndex) {
-        return { ...column, tasks: column.tasks.filter((item) => item.id !== taskId) };
-      }
+    const task = tasks.find((item) => getDocumentId(item) === taskId);
 
-      if (index === targetIndex) {
-        return { ...column, tasks: [...column.tasks, task] };
-      }
+    try {
+      const payload = await apiRequest(`/tasks/${taskId}`, {
+        method: 'PATCH',
+        token,
+        body: { status: targetColumnId }
+      });
+      const nextTasks = tasks.map((item) => (getDocumentId(item) === taskId ? payload.task : item));
 
-      return column;
-    });
-
-    setColumns(nextColumns);
-    showToast(`${task.title} -> ${columns[targetIndex].title}`);
+      setTasks(nextTasks);
+      setColumns(buildColumns(nextTasks));
+      setProjects((current) => current.map((project) => normalizeProject(project, nextTasks)));
+      showToast(`${task?.title || 'Task'} -> ${columns[targetIndex].title}`);
+    } catch (error) {
+      showToast(error.message || 'Task move failed');
+    }
   };
 
-  if (!activeProject) {
+  if (currentUser && isLoading && projects.length === 0) {
     return (
       <main className="tf-page">
         <AppHeader currentUser={currentUser} onLogout={logout} onToast={showToast} />
         <section className="tf-empty">
-          <h1>No projects yet.</h1>
-          <Link className="tf-button tf-button-lime" to="/projects">
-            Create project
-          </Link>
+          <h1>Loading workspace.</h1>
         </section>
       </main>
     );
@@ -318,7 +430,7 @@ function App() {
             currentUser ? (
               <Navigate to="/" replace />
             ) : (
-              <SignupPage hasAccount={Boolean(registeredUser)} onSignup={signup} />
+              <SignupPage onSignup={signup} />
             )
           }
         />
@@ -328,13 +440,13 @@ function App() {
             currentUser ? (
               <Navigate to="/" replace />
             ) : (
-              <LoginPage hasAccount={Boolean(registeredUser)} onLogin={login} />
+              <LoginPage onLogin={login} />
             )
           }
         />
         <Route
           path="/"
-          element={currentUser ? (
+          element={currentUser ? (activeProject ? (
             <DashboardPage
               activeProject={activeProject}
               columns={columns}
@@ -348,12 +460,15 @@ function App() {
               toast={toast}
             />
           ) : (
+            <Navigate to="/projects" replace />
+          )
+          ) : (
             <Navigate to="/signup" replace />
           )}
         />
         <Route
           path="/board"
-          element={currentUser ? (
+          element={currentUser ? (activeProject ? (
             <BoardPage
               activeProject={activeProject}
               columns={columns}
@@ -363,6 +478,9 @@ function App() {
               projects={projects}
               toast={toast}
             />
+          ) : (
+            <Navigate to="/projects" replace />
+          )
           ) : (
             <Navigate to="/signup" replace />
           )}
@@ -387,7 +505,7 @@ function App() {
         />
         <Route
           path="/team"
-          element={currentUser ? (
+          element={currentUser ? (activeProject ? (
             <TeamPage
               activeProjectId={activeProjectId}
               invitations={invitations}
@@ -397,6 +515,9 @@ function App() {
               setActiveProjectId={setActiveProjectId}
               toast={toast}
             />
+          ) : (
+            <Navigate to="/projects" replace />
+          )
           ) : (
             <Navigate to="/signup" replace />
           )}
@@ -467,24 +588,34 @@ function AppHeader({ currentUser, onLogout, onToast }) {
   );
 }
 
-function SignupPage({ hasAccount, onSignup }) {
+function SignupPage({ onSignup }) {
   const navigate = useNavigate();
   const [error, setError] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const name = String(formData.get('name') || '').trim();
     const email = String(formData.get('email') || '').trim().toLowerCase();
     const password = String(formData.get('password') || '');
 
-    if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 6) {
-      setError('Enter a name, valid email, and password with at least 6 characters.');
+    if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8) {
+      setError('Enter a name, valid email, and password with at least 8 characters.');
       return;
     }
 
-    onSignup({ name, email, password });
-    navigate('/');
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      await onSignup({ name, email, password });
+      navigate('/');
+    } catch (apiError) {
+      setError(apiError.message || 'Signup failed');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -497,14 +628,13 @@ function SignupPage({ hasAccount, onSignup }) {
 
       <form className="tf-auth-card" onSubmit={handleSubmit}>
         <h2>Sign up</h2>
-        {hasAccount && <p className="tf-form-note">An account already exists in this session. You can still replace it.</p>}
         {error && <p className="tf-form-error">{error}</p>}
         <Field label="Full name" name="name" placeholder="Deepak Kumar" />
         <Field label="Email address" name="email" placeholder="deepak@example.com" type="email" />
-        <Field label="Password" name="password" placeholder="Minimum 6 characters" type="password" />
+        <Field label="Password" name="password" placeholder="Minimum 8 characters" type="password" />
         <div className="tf-form-actions">
-          <button className="tf-button tf-button-lime small" type="submit">
-            Create account
+          <button className="tf-button tf-button-lime small" disabled={isSubmitting} type="submit">
+            {isSubmitting ? 'Creating...' : 'Create account'}
           </button>
           <Link className="tf-button tf-button-white small" to="/login">
             Login
@@ -515,23 +645,28 @@ function SignupPage({ hasAccount, onSignup }) {
   );
 }
 
-function LoginPage({ hasAccount, onLogin }) {
+function LoginPage({ onLogin }) {
   const navigate = useNavigate();
   const [error, setError] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get('email') || '').trim().toLowerCase();
     const password = String(formData.get('password') || '');
-    const result = onLogin({ email, password });
 
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      await onLogin({ email, password });
+      navigate('/');
+    } catch (apiError) {
+      setError(apiError.message || 'Login failed');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    navigate('/');
   };
 
   return (
@@ -544,13 +679,12 @@ function LoginPage({ hasAccount, onLogin }) {
 
       <form className="tf-auth-card" onSubmit={handleSubmit}>
         <h2>Login</h2>
-        {!hasAccount && <p className="tf-form-note">No account yet. Create one first from the signup page.</p>}
         {error && <p className="tf-form-error">{error}</p>}
         <Field label="Email address" name="email" placeholder="deepak@example.com" type="email" />
         <Field label="Password" name="password" placeholder="Your password" type="password" />
         <div className="tf-form-actions">
-          <button className="tf-button tf-button-lime small" type="submit">
-            Login
+          <button className="tf-button tf-button-lime small" disabled={isSubmitting} type="submit">
+            {isSubmitting ? 'Logging in...' : 'Login'}
           </button>
           <Link className="tf-button tf-button-white small" to="/signup">
             Sign up
@@ -668,9 +802,11 @@ function DashboardPage({
       </section>
 
       {panel === 'task' && (
-        <TaskModal onClose={() => setPanel(null)} onSubmit={(payload) => {
-          onAddTask(payload);
-          setPanel(null);
+        <TaskModal onClose={() => setPanel(null)} onSubmit={async (payload) => {
+          const saved = await onAddTask(payload);
+          if (saved) {
+            setPanel(null);
+          }
         }} />
       )}
     </>
@@ -724,6 +860,14 @@ function ProjectsPage({
               <span>{projects.length}</span>
             </div>
             <div className="tf-project-table">
+              {projects.length === 0 && (
+                <article className="tf-project-row">
+                  <button className="tf-project-row-main" onClick={() => setPanel('project')} type="button">
+                    <strong>No projects yet</strong>
+                    <span>Create your first project to unlock board and team workflows.</span>
+                  </button>
+                </article>
+              )}
               {projects.map((project) => (
                 <article className={`tf-project-row ${selectedProject?.id === project.id ? 'is-active' : ''}`} key={project.id}>
                   <button
@@ -747,43 +891,60 @@ function ProjectsPage({
             </div>
           </section>
 
-          <aside className="tf-panel">
-            <div className="tf-panel-head">
-              <h2>{selectedProject?.name}</h2>
-              <span>{toast}</span>
-            </div>
-            <div className="tf-project-detail">
-              <p>Owner: {selectedProject?.owner}</p>
-              <div className="tf-meter">
-                <span style={{ width: `${selectedProject?.progress || 0}%` }} />
+          {selectedProject ? (
+            <aside className="tf-panel">
+              <div className="tf-panel-head">
+                <h2>{selectedProject.name}</h2>
+                <span>{toast}</span>
               </div>
-              <button className="tf-button tf-button-lime small" onClick={() => openMemberPanel(selectedProject.id)} type="button">
-                Add team member
-              </button>
-            </div>
+              <div className="tf-project-detail">
+                <p>Owner: {selectedProject.owner}</p>
+                <div className="tf-meter">
+                  <span style={{ width: `${selectedProject.progress || 0}%` }} />
+                </div>
+                <button className="tf-button tf-button-lime small" onClick={() => openMemberPanel(selectedProject.id)} type="button">
+                  Add team member
+                </button>
+              </div>
 
-            <div className="tf-project-team">
-              <h3>Project team</h3>
-              {selectedProject?.team.map((member) => (
-                <span className="tf-member" key={member.id}>
-                  {member.name}
-                  <small>{member.email}</small>
-                  <button aria-label={`Delete ${member.name}`} onClick={() => onDeleteMember(selectedProject.id, member.id)} type="button">
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          </aside>
+              <div className="tf-project-team">
+                <h3>Project team</h3>
+                {selectedProject.team.map((member) => (
+                  <span className="tf-member" key={member.id}>
+                    {member.name}
+                    <small>{member.email}</small>
+                    <button aria-label={`Delete ${member.name}`} onClick={() => onDeleteMember(selectedProject.id, member.id)} type="button">
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </aside>
+          ) : (
+            <aside className="tf-panel">
+              <div className="tf-panel-head">
+                <h2>Start here</h2>
+                <span>{toast}</span>
+              </div>
+              <div className="tf-project-detail">
+                <p>Create a project first. Tasks and teammates will connect to that project.</p>
+                <button className="tf-button tf-button-lime small" onClick={() => setPanel('project')} type="button">
+                  Add project
+                </button>
+              </div>
+            </aside>
+          )}
         </div>
       </section>
 
       <InvitePanel invitations={invitations} compact />
 
       {panel === 'project' && (
-        <ProjectModal onClose={() => setPanel(null)} onSubmit={(payload) => {
-          onAddProject(payload);
-          setPanel(null);
+        <ProjectModal onClose={() => setPanel(null)} onSubmit={async (payload) => {
+          const saved = await onAddProject(payload);
+          if (saved) {
+            setPanel(null);
+          }
         }} />
       )}
 
@@ -861,9 +1022,11 @@ function BoardPage({ activeProject, columns, deleteTask, moveTaskToColumn, onAdd
       </section>
 
       {panel === 'task' && (
-        <TaskModal onClose={() => setPanel(null)} onSubmit={(payload) => {
-          onAddTask(payload);
-          setPanel(null);
+        <TaskModal onClose={() => setPanel(null)} onSubmit={async (payload) => {
+          const saved = await onAddTask(payload);
+          if (saved) {
+            setPanel(null);
+          }
         }} />
       )}
     </>
@@ -1096,30 +1259,36 @@ function InvitePanel({ compact = false, invitations }) {
 }
 
 function ProjectModal({ onClose, onSubmit }) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
   return (
     <Modal>
       <form
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
           const name = String(formData.get('name') || '').trim();
-          const owner = String(formData.get('owner') || '').trim() || 'Deepak';
+          const description = String(formData.get('description') || '').trim();
 
           if (name) {
-            onSubmit({ name, owner });
+            setIsSubmitting(true);
+            await onSubmit({ name, description });
+            setIsSubmitting(false);
           }
         }}
       >
         <h2>Create project</h2>
         <Field label="Project name" name="name" placeholder="New workspace" />
-        <Field label="Owner" name="owner" placeholder="Deepak" />
-        <PanelActions onClose={onClose} submitLabel="Create" />
+        <Field label="Description" name="description" placeholder="Project goals" />
+        <PanelActions disabled={isSubmitting} onClose={onClose} submitLabel={isSubmitting ? 'Creating...' : 'Create'} />
       </form>
     </Modal>
   );
 }
 
 function MemberModal({ onClose, onSubmit, projectName }) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
   return (
     <Modal>
       <form
@@ -1130,7 +1299,9 @@ function MemberModal({ onClose, onSubmit, projectName }) {
           const email = String(formData.get('email') || '').trim().toLowerCase();
 
           if (name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            setIsSubmitting(true);
             await onSubmit({ name, email });
+            setIsSubmitting(false);
           }
         }}
       >
@@ -1138,29 +1309,33 @@ function MemberModal({ onClose, onSubmit, projectName }) {
         <Field label="Member name" name="name" placeholder="Teammate name" />
         <Field label="Email address" name="email" placeholder="teammate@example.com" type="email" />
         <p className="tf-form-note">Sends: “You got an invitation to join {projectName} on TeamFlow.”</p>
-        <PanelActions onClose={onClose} submitLabel="Invite" />
+        <PanelActions disabled={isSubmitting} onClose={onClose} submitLabel={isSubmitting ? 'Inviting...' : 'Invite'} />
       </form>
     </Modal>
   );
 }
 
 function TaskModal({ onClose, onSubmit }) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
   return (
     <Modal>
       <form
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
           const title = String(formData.get('title') || '').trim();
 
           if (title) {
-            onSubmit({ title });
+            setIsSubmitting(true);
+            await onSubmit({ title });
+            setIsSubmitting(false);
           }
         }}
       >
         <h2>Add task</h2>
         <Field label="Task title" name="title" placeholder="Create task" />
-        <PanelActions onClose={onClose} submitLabel="Add task" />
+        <PanelActions disabled={isSubmitting} onClose={onClose} submitLabel={isSubmitting ? 'Adding...' : 'Add task'} />
       </form>
     </Modal>
   );
@@ -1216,10 +1391,10 @@ function Field({ label, name, placeholder, type = 'text' }) {
   );
 }
 
-function PanelActions({ onClose, submitLabel }) {
+function PanelActions({ disabled = false, onClose, submitLabel }) {
   return (
     <div className="tf-form-actions">
-      <button className="tf-button tf-button-lime small" type="submit">
+      <button className="tf-button tf-button-lime small" disabled={disabled} type="submit">
         {submitLabel}
       </button>
       <button className="tf-button tf-button-white small" onClick={onClose} type="button">
