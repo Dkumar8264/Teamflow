@@ -23,6 +23,7 @@ SMTP_SECURE=false
 SMTP_USER=yourgmail@gmail.com
 SMTP_PASS=your-16-character-app-password
 MAIL_FROM=TeamFlow <yourgmail@gmail.com>
+SMTP_TIMEOUT_MS=10000
 ```
 
 ## Backend Deployment Checklist

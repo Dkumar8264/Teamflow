@@ -311,24 +311,6 @@ function App() {
       return false;
     }
 
-    let emailResult;
-
-    try {
-      emailResult = await apiRequest('/invitations/send', {
-        method: 'POST',
-        token,
-        body: {
-          name,
-          email,
-          projectId,
-          projectName: project.name
-        }
-      });
-    } catch (error) {
-      showToast(error.message || 'Invitation email failed');
-      return false;
-    }
-
     try {
       const memberPayload = await apiRequest(`/projects/${projectId}/members`, {
         method: 'POST',
@@ -344,17 +326,40 @@ function App() {
       return false;
     }
 
+    let emailResult;
+
+    try {
+      emailResult = await apiRequest('/invitations/send', {
+        method: 'POST',
+        token,
+        body: {
+          name,
+          email,
+          projectId,
+          projectName: project.name
+        }
+      });
+    } catch (error) {
+      emailResult = {
+        message: error.message || 'Member added, email delivery failed',
+        email: {
+          mode: 'failed',
+          delivered: false
+        }
+      };
+    }
+
     const invitation = {
       id: Date.now(),
       name,
       email,
       project: project.name,
       message: `You got an invitation to join ${project.name} on TeamFlow.`,
-      emailMode: emailResult.email.mode
+      emailMode: emailResult.email?.mode || 'failed'
     };
 
     setInvitations((current) => [invitation, ...current]);
-    showToast(emailResult.message);
+    showToast(emailResult.message || `${name} added`);
     return true;
   };
 

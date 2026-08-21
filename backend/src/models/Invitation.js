@@ -46,8 +46,14 @@ const invitationSchema = new mongoose.Schema(
     },
     emailMode: {
       type: String,
-      enum: ['smtp', 'preview'],
+      enum: ['smtp', 'preview', 'failed'],
       default: 'preview'
+    },
+    emailError: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Email error cannot exceed 500 characters'],
+      default: ''
     },
     emailMessageId: {
       type: String,

@@ -26,7 +26,23 @@ router.post('/send', async (req, res, next) => {
 
     const project = projectId ? await getAccessibleProject(projectId, req.user, { requireOwner: true }) : null;
     const projectName = project?.name || fallbackProjectName;
-    const result = await sendInvitationEmail({ email, name, projectName });
+    let result;
+
+    try {
+      result = await sendInvitationEmail({ email, name, projectName });
+    } catch (error) {
+      result = {
+        delivered: false,
+        mode: 'failed',
+        error: error.message
+      };
+      console.error('[email] Invitation email failed', {
+        to: email,
+        projectName,
+        message: error.message
+      });
+    }
+
     const invitation = project
       ? await Invitation.create({
           project: project._id,
@@ -36,7 +52,8 @@ router.post('/send', async (req, res, next) => {
           role: req.body.role || 'member',
           message: `You got an invitation to join ${projectName} on TeamFlow.`,
           emailMode: result.mode,
-          emailMessageId: result.messageId || ''
+          emailMessageId: result.messageId || '',
+          emailError: result.error || ''
         })
       : null;
 
@@ -45,12 +62,15 @@ router.post('/send', async (req, res, next) => {
       message:
         result.mode === 'smtp'
           ? `Invitation email sent to ${email}`
-          : `Invitation email preview generated for ${email}. Configure SMTP to send real email.`,
+          : result.mode === 'preview'
+            ? `Invitation email preview generated for ${email}. Configure SMTP to send real email.`
+            : `Member invited, but email delivery failed: ${result.error}`,
       email: {
         delivered: result.delivered,
         mode: result.mode,
         messageId: result.messageId,
-        preview: result.mode === 'preview' ? result.message : undefined
+        preview: result.mode === 'preview' ? result.message : undefined,
+        error: result.error
       },
       invitation
     });
