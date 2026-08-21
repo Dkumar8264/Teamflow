@@ -74,6 +74,8 @@ const normalizeProject = (project, tasks = []) => ({
   id: getDocumentId(project),
   name: project.name,
   description: project.description || '',
+  createdAt: project.createdAt,
+  updatedAt: project.updatedAt,
   owner: project.members?.find((member) => member.role === 'owner')?.name || project.owner?.name || 'Owner',
   progress: getProjectProgress(getDocumentId(project), tasks),
   team: project.team || (project.members || []).map(normalizeMember)
@@ -84,7 +86,10 @@ const normalizeTask = (task) => ({
   title: task.title,
   project: task.project?.name || task.projectName || 'Project',
   projectId: getDocumentId(task.project) || task.project,
-  status: task.status || 'todo'
+  status: task.status || 'todo',
+  priority: task.priority || 'medium',
+  createdAt: task.createdAt,
+  updatedAt: task.updatedAt
 });
 
 const buildColumns = (tasks) =>
@@ -94,6 +99,48 @@ const buildColumns = (tasks) =>
   }));
 
 const getAuthToken = (auth) => auth?.token || auth?.accessToken || '';
+
+const getUniqueMemberCount = (projects) => {
+  const members = new Set();
+
+  projects.forEach((project) => {
+    project.team.forEach((member) => {
+      members.add(member.email || member.id || member.name);
+    });
+  });
+
+  return members.size;
+};
+
+const getRecentActivity = (projects, tasks) => {
+  const taskEvents = tasks.map((task) => ({
+    id: `task-${getDocumentId(task)}`,
+    label: task.status === 'done' ? 'Task completed' : 'Task updated',
+    title: task.title,
+    meta: task.project?.name || 'Project task',
+    date: task.updatedAt || task.createdAt
+  }));
+  const projectEvents = projects.map((project) => ({
+    id: `project-${project.id}`,
+    label: 'Project active',
+    title: project.name,
+    meta: `${project.team.length} members`,
+    date: project.updatedAt || project.createdAt
+  }));
+
+  return [...taskEvents, ...projectEvents]
+    .filter((event) => event.date)
+    .sort((left, right) => new Date(right.date) - new Date(left.date))
+    .slice(0, 5);
+};
+
+const formatActivityDate = (date) =>
+  new Intl.DateTimeFormat('en', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(date));
 
 function App() {
   const [auth, setAuth] = React.useState(() => {
@@ -463,6 +510,7 @@ function App() {
               projects={projects}
               setActiveProjectId={setActiveProjectId}
               showToast={showToast}
+              tasks={tasks}
               toast={toast}
             />
           ) : (
@@ -711,10 +759,16 @@ function DashboardPage({
   projects,
   setActiveProjectId,
   showToast,
+  tasks,
   toast
 }) {
   const [panel, setPanel] = React.useState(null);
   const taskCount = columns.reduce((count, column) => count + column.tasks.length, 0);
+  const completedTaskCount = tasks.filter((task) => task.status === 'done').length;
+  const openTaskCount = Math.max(taskCount - completedTaskCount, 0);
+  const totalMemberCount = getUniqueMemberCount(projects);
+  const activeProjectTasks = tasks.filter((task) => getDocumentId(task.project) === activeProject.id || task.project === activeProject.id);
+  const recentActivity = getRecentActivity(projects, tasks);
   const navigate = useNavigate();
 
   return (
@@ -759,15 +813,79 @@ function DashboardPage({
               <strong>{projects.length}</strong>
             </div>
             <div>
-              <span>TASKS</span>
-              <strong>{taskCount}</strong>
+              <span>OPEN TASKS</span>
+              <strong>{openTaskCount}</strong>
+            </div>
+            <div>
+              <span>DONE</span>
+              <strong>{completedTaskCount}</strong>
             </div>
             <div>
               <span>MEMBERS</span>
-              <strong>{activeProject.team.length}</strong>
+              <strong>{totalMemberCount}</strong>
+            </div>
+          </div>
+          <div className="tf-dashboard-strip">
+            <div>
+              <span>Active project tasks</span>
+              <strong>{activeProjectTasks.length}</strong>
+            </div>
+            <div>
+              <span>Invites sent</span>
+              <strong>{invitations.length}</strong>
             </div>
           </div>
         </aside>
+      </section>
+
+      <section className="tf-dashboard-grid">
+        <article className="tf-panel">
+          <div className="tf-panel-head">
+            <h2>Workspace metrics</h2>
+            <span>{toast}</span>
+          </div>
+          <div className="tf-metric-grid">
+            <div>
+              <span>Total tasks</span>
+              <strong>{taskCount}</strong>
+              <p>{completedTaskCount} completed</p>
+            </div>
+            <div>
+              <span>Team members</span>
+              <strong>{totalMemberCount}</strong>
+              <p>Across {projects.length} projects</p>
+            </div>
+            <div>
+              <span>Completion</span>
+              <strong>{taskCount ? Math.round((completedTaskCount / taskCount) * 100) : 0}%</strong>
+              <p>{openTaskCount} still open</p>
+            </div>
+          </div>
+        </article>
+
+        <article className="tf-panel">
+          <div className="tf-panel-head">
+            <h2>Recent activity</h2>
+            <span>{recentActivity.length}</span>
+          </div>
+          <div className="tf-activity-list">
+            {recentActivity.length > 0 ? (
+              recentActivity.map((activity) => (
+                <div className="tf-activity" key={activity.id}>
+                  <span>{activity.label}</span>
+                  <strong>{activity.title}</strong>
+                  <p>{activity.meta} / {formatActivityDate(activity.date)}</p>
+                </div>
+              ))
+            ) : (
+              <div className="tf-activity">
+                <span>No activity yet</span>
+                <strong>Create a project or task</strong>
+                <p>Your dashboard will update here.</p>
+              </div>
+            )}
+          </div>
+        </article>
       </section>
 
       <section className="tf-shell">

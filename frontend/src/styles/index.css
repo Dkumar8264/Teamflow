@@ -254,7 +254,7 @@ button:disabled {
 
 .tf-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin-top: 18px;
 }
@@ -279,6 +279,78 @@ button:disabled {
   margin-top: 5px;
   font-size: 26px;
   font-weight: 950;
+}
+
+.tf-dashboard-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.tf-dashboard-strip div,
+.tf-metric-grid div,
+.tf-activity {
+  border: 2px solid #000;
+  border-radius: 16px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.tf-dashboard-strip span,
+.tf-metric-grid span,
+.tf-activity span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.tf-dashboard-strip strong,
+.tf-metric-grid strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 28px;
+  font-weight: 950;
+}
+
+.tf-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(320px, 0.65fr);
+  gap: 22px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 clamp(18px, 4vw, 56px) 8px;
+}
+
+.tf-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.tf-metric-grid p,
+.tf-activity p {
+  margin: 6px 0 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tf-activity-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.tf-activity strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 16px;
+  font-weight: 950;
+  text-transform: uppercase;
 }
 
 .tf-shell {
