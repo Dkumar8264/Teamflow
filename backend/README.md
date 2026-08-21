@@ -1,6 +1,6 @@
 # TeamFlow Backend
 
-Express and MongoDB backend for TeamFlow authentication.
+Express and MongoDB backend for TeamFlow authentication, projects, tasks, and invitation emails.
 
 ## Folder Structure
 
@@ -14,13 +14,21 @@ backend/
       database.js
     controllers/
       authController.js
+      projectController.js
+      taskController.js
     middleware/
       auth.js
       errorHandler.js
     models/
+      Invitation.js
+      Project.js
+      Task.js
       User.js
     routes/
       auth.js
+      invitations.js
+      projects.js
+      tasks.js
     utils/
       AppError.js
 ```
@@ -56,6 +64,35 @@ npm run dev
 ```
 
 The API runs on `http://localhost:5000` by default.
+
+## Scripts
+
+- `npm run dev` - start the API with nodemon.
+- `npm start` - start the API with Node.
+- `npm run check` - syntax-check `server.js`.
+- `npm run test:email -- teammate@example.com` - verify SMTP and send a TeamFlow invitation test email.
+
+## Invitation Email
+
+TeamFlow uses SMTP through Nodemailer. Without SMTP values, invitation requests return an email preview instead of sending.
+The invitation email includes the first URL from `CLIENT_URL` as the TeamFlow website link.
+
+For Gmail, enable 2-step verification, create an app password, then set:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=yourgmail@gmail.com
+SMTP_PASS=your-16-character-app-password
+MAIL_FROM=TeamFlow <yourgmail@gmail.com>
+```
+
+After saving `.env`, restart `npm run dev` and test with:
+
+```bash
+npm run test:email -- teammate@example.com
+```
 
 ## Auth Endpoints
 

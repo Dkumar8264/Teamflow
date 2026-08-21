@@ -29,6 +29,10 @@ const getErrorMessage = (payload, fallback) => {
 };
 
 const apiRequest = async (path, { body, method = 'GET', token } = {}) => {
+  if (path !== '/auth/signup' && path !== '/auth/login' && !token) {
+    throw new Error('Please log in again');
+  }
+
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method,
     headers: {
@@ -89,6 +93,8 @@ const buildColumns = (tasks) =>
     tasks: tasks.filter((task) => task.status === column.id).map(normalizeTask)
   }));
 
+const getAuthToken = (auth) => auth?.token || auth?.accessToken || '';
+
 function App() {
   const [auth, setAuth] = React.useState(() => {
     const storedAuth = window.localStorage.getItem(authStorageKey);
@@ -102,8 +108,8 @@ function App() {
   const [activeProjectId, setActiveProjectId] = React.useState(null);
   const [toast, setToast] = React.useState('SYSTEM ONLINE');
   const [isLoading, setIsLoading] = React.useState(false);
-  const currentUser = auth?.user || null;
-  const token = auth?.token || '';
+  const token = getAuthToken(auth);
+  const currentUser = auth?.user && token ? auth.user : null;
 
   const activeProject = projects.find((project) => project.id === activeProjectId) || projects[0];
 
@@ -147,6 +153,14 @@ function App() {
       loadWorkspace(token);
     }
   }, [loadWorkspace, token]);
+
+  React.useEffect(() => {
+    if (auth?.user && !token) {
+      setAuth(null);
+      window.localStorage.removeItem(authStorageKey);
+      showToast('Please log in again');
+    }
+  }, [auth, token]);
 
   const saveAuth = (payload) => {
     const nextAuth = {
@@ -242,26 +256,18 @@ function App() {
     let emailResult;
 
     try {
-      const response = await fetch(`${apiBaseUrl}/invitations/send`, {
+      emailResult = await apiRequest('/invitations/send', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+        token,
+        body: {
           name,
           email,
+          projectId,
           projectName: project.name
-        })
+        }
       });
-
-      emailResult = await response.json();
-
-      if (!response.ok || !emailResult.success) {
-        showToast(emailResult.message || 'Invitation email failed');
-        return false;
-      }
     } catch (error) {
-      showToast('Invitation email service unavailable');
+      showToast(error.message || 'Invitation email failed');
       return false;
     }
 
