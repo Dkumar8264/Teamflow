@@ -54,6 +54,15 @@ const parseAllowedOrigins = () =>
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+const isAllowedVercelPreview = (origin = '') => {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return protocol === 'https:' && /^teamflow(?:-[a-z0-9-]+)?\.vercel\.app$/.test(hostname);
+  } catch (_error) {
+    return false;
+  }
+};
+
 app.disable('x-powered-by');
 
 app.use(
@@ -62,7 +71,7 @@ app.use(
     origin(origin, callback) {
       const allowedOrigins = parseAllowedOrigins();
 
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || isAllowedVercelPreview(origin)) {
         return callback(null, true);
       }
 
