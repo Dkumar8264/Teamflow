@@ -2,7 +2,11 @@ import React from 'react';
 import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 
 const features = ['Projects', 'Team roles', 'Kanban tasks', 'Comments', 'Notifications', 'Real-time sync'];
-const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api';
+const localApiBaseUrl = 'http://127.0.0.1:5000/api';
+const deployedApiBaseUrl = 'https://teamflow-wdrw.onrender.com/api';
+const isLocalApp =
+  typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const apiBaseUrl = import.meta.env.VITE_API_URL || (isLocalApp ? localApiBaseUrl : deployedApiBaseUrl);
 const authStorageKey = 'teamflow_auth';
 
 const columnDefinitions = [
