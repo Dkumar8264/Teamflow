@@ -34,6 +34,31 @@ SMTP_TIMEOUT_MS=10000
 - Start the server with `npm start`.
 - Verify `GET /health` returns a success response.
 
+## Render Backend Settings
+
+This repo includes `render.yaml` for a Render web service rooted at `backend/`.
+
+For an existing manually configured Render service, use:
+
+```text
+Root Directory: backend
+Build Command: npm install
+Start Command: npm start
+Health Check Path: /health
+```
+
+Set these environment variables in Render:
+
+```env
+NODE_ENV=production
+CLIENT_URL=https://teamflow-dusky.vercel.app
+MONGO_URI=<your MongoDB Atlas connection string>
+JWT_SECRET=<long-random-secret>
+JWT_REFRESH_SECRET=<another-long-random-secret>
+JWT_EXPIRES_IN=7d
+JWT_REFRESH_EXPIRES_IN=7d
+```
+
 ## Frontend Deployment Checklist
 
 - Deploy the backend first and verify `https://your-backend-domain.com/health`.
