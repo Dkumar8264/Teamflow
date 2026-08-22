@@ -3,6 +3,8 @@ const nodemailer = require('nodemailer');
 const hasSmtpConfig = () =>
   Boolean(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS);
 
+const hasResendConfig = () => Boolean(process.env.RESEND_API_KEY);
+
 const escapeHtml = (value) =>
   String(value)
     .replace(/&/g, '&amp;')
@@ -67,7 +69,7 @@ const buildInvitationEmail = ({ email, name, projectName }) => {
   `;
 
   return {
-    from: process.env.MAIL_FROM || process.env.SMTP_USER || 'TeamFlow <no-reply@teamflow.local>',
+    from: process.env.MAIL_FROM || process.env.SMTP_USER || 'TeamFlow <onboarding@resend.dev>',
     to: email,
     subject,
     text,
@@ -75,11 +77,43 @@ const buildInvitationEmail = ({ email, name, projectName }) => {
   };
 };
 
+const sendWithResend = async (message) => {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: message.from,
+      to: [message.to],
+      subject: message.subject,
+      text: message.text,
+      html: message.html
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.message || payload.error || `Resend API failed with status ${response.status}`);
+  }
+
+  return {
+    delivered: true,
+    mode: 'resend',
+    messageId: payload.id
+  };
+};
+
 const sendInvitationEmail = async (payload) => {
   const message = buildInvitationEmail(payload);
 
+  if (hasResendConfig()) {
+    return sendWithResend(message);
+  }
+
   if (!hasSmtpConfig()) {
-    console.info('[email] SMTP not configured; invitation email preview generated', {
+    console.info('[email] Email provider not configured; invitation email preview generated', {
       to: message.to,
       subject: message.subject
     });
@@ -102,11 +136,19 @@ const sendInvitationEmail = async (payload) => {
 };
 
 const verifyEmailTransport = async () => {
+  if (hasResendConfig()) {
+    return {
+      ok: true,
+      mode: 'resend',
+      message: 'Resend API key configured'
+    };
+  }
+
   if (!hasSmtpConfig()) {
     return {
       ok: false,
       mode: 'preview',
-      message: 'SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS are required for real email delivery'
+      message: 'RESEND_API_KEY or SMTP settings are required for real email delivery'
     };
   }
 
@@ -122,6 +164,7 @@ const verifyEmailTransport = async () => {
 
 module.exports = {
   buildInvitationEmail,
+  hasResendConfig,
   hasSmtpConfig,
   verifyEmailTransport,
   sendInvitationEmail

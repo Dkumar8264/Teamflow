@@ -17,6 +17,8 @@ JWT_EXPIRES_IN=7d
 JWT_REFRESH_SECRET=<another-long-random-secret>
 JWT_REFRESH_EXPIRES_IN=7d
 CLIENT_URL=https://your-frontend-domain.com
+RESEND_API_KEY=<your-resend-api-key>
+MAIL_FROM=TeamFlow <onboarding@resend.dev>
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false
@@ -58,15 +60,11 @@ JWT_SECRET=<long-random-secret>
 JWT_REFRESH_SECRET=<another-long-random-secret>
 JWT_EXPIRES_IN=7d
 JWT_REFRESH_EXPIRES_IN=7d
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_FAMILY=4
-SMTP_USER=<your Gmail address>
-SMTP_PASS=<your Gmail app password>
-MAIL_FROM=TeamFlow <your Gmail address>
-SMTP_TIMEOUT_MS=10000
+RESEND_API_KEY=<your-resend-api-key>
+MAIL_FROM=TeamFlow <onboarding@resend.dev>
 ```
+
+Render free services block outbound SMTP ports, so use `RESEND_API_KEY` for invitation emails. The `onboarding@resend.dev` sender is fine for testing. For production, verify your own domain in Resend and change `MAIL_FROM`.
 
 ## Frontend Deployment Checklist
 
