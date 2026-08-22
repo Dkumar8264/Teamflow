@@ -52,6 +52,51 @@ That URL only works on your laptop. For deployment:
 - Set `CLIENT_URL=https://your-vercel-app.vercel.app` in the backend host.
 - Redeploy the frontend after changing `VITE_API_URL`.
 
+## Vercel Direct Routes Return NOT_FOUND
+
+If a direct URL such as `https://teamflow-dusky.vercel.app/signup` returns Vercel `NOT_FOUND`, the React app is not being served for client-side routes.
+
+Make sure `frontend/vercel.json` is deployed with:
+
+```json
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+Then redeploy the frontend.
+
+## Live Signup Still Fails After The Page Loads
+
+Run:
+
+```bash
+npm run smoke:live
+```
+
+For the current deployment, the frontend should use:
+
+```env
+VITE_API_URL=https://teamflow-wdrw.onrender.com/api
+```
+
+The backend host should use:
+
+```env
+NODE_ENV=production
+CLIENT_URL=https://teamflow-dusky.vercel.app
+MONGO_URI=<your MongoDB Atlas connection string>
+JWT_SECRET=<long-random-secret>
+JWT_REFRESH_SECRET=<another-long-random-secret>
+```
+
+If `backend health` times out, restart or redeploy the Render backend and confirm `https://teamflow-wdrw.onrender.com/health` responds before testing signup again.
+
 ## npm Audit Warnings
 
 Run:
