@@ -60,7 +60,7 @@ router.post('/send', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message:
-        result.mode === 'smtp'
+        result.delivered
           ? `Invitation email sent to ${email}`
           : result.mode === 'preview'
             ? `Invitation email preview generated for ${email}. Configure SMTP to send real email.`

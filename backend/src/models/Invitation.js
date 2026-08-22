@@ -46,7 +46,7 @@ const invitationSchema = new mongoose.Schema(
     },
     emailMode: {
       type: String,
-      enum: ['smtp', 'preview', 'failed'],
+      enum: ['resend', 'smtp', 'preview', 'failed'],
       default: 'preview'
     },
     emailError: {
