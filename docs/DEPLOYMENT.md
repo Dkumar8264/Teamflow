@@ -20,6 +20,7 @@ CLIENT_URL=https://your-frontend-domain.com
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false
+SMTP_FAMILY=4
 SMTP_USER=yourgmail@gmail.com
 SMTP_PASS=your-16-character-app-password
 MAIL_FROM=TeamFlow <yourgmail@gmail.com>
@@ -57,6 +58,14 @@ JWT_SECRET=<long-random-secret>
 JWT_REFRESH_SECRET=<another-long-random-secret>
 JWT_EXPIRES_IN=7d
 JWT_REFRESH_EXPIRES_IN=7d
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_FAMILY=4
+SMTP_USER=<your Gmail address>
+SMTP_PASS=<your Gmail app password>
+MAIL_FROM=TeamFlow <your Gmail address>
+SMTP_TIMEOUT_MS=10000
 ```
 
 ## Frontend Deployment Checklist
