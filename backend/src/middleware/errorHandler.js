@@ -51,6 +51,7 @@ const errorHandler = (error, req, res, next) => {
     success: false,
     message: normalizedError.message,
     details: normalizedError.details,
+    code: normalizedError.errorCode,
     stack: isProduction ? undefined : error.stack
   });
 };

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const AppError = require('../utils/AppError');
+const { verifyFirebaseIdToken } = require('../config/firebaseAdmin');
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -176,9 +177,67 @@ const getMe = async (req, res) => {
   });
 };
 
+const googleSignIn = async (req, res, next) => {
+  try {
+    const decoded = await verifyFirebaseIdToken(req.body.idToken);
+    const email = normalizeEmail(decoded.email);
+
+    if (!EMAIL_REGEX.test(email)) {
+      throw new AppError('Google account did not provide a usable email address', 400);
+    }
+
+    // Google-federated identities are verified by Google, so a missing
+    // email_verified claim is treated as untrusted rather than assumed.
+    if (decoded.email_verified === false) {
+      throw new AppError('Google account email is not verified', 403);
+    }
+
+    const name = String(decoded.name || '').trim() || email.split('@')[0];
+    let user = await User.findOne({ email });
+
+    if (user) {
+      // Link the Google identity to the existing account rather than failing on
+      // the unique email index. Local accounts keep their password login.
+      if (!user.firebaseUid) {
+        user.firebaseUid = decoded.uid;
+      }
+
+      if (!user.avatarUrl && decoded.picture) {
+        user.avatarUrl = decoded.picture;
+      }
+
+      if (user.isModified()) {
+        await user.save({ validateModifiedOnly: true });
+      }
+
+      console.info('[auth] Google sign-in for existing user', {
+        userId: user._id.toString(),
+        provider: user.provider
+      });
+    } else {
+      user = await User.create({
+        name: name.slice(0, 80),
+        email,
+        provider: 'google',
+        firebaseUid: decoded.uid,
+        avatarUrl: decoded.picture || ''
+      });
+
+      console.info('[auth] Google sign-in provisioned new user', {
+        userId: user._id.toString()
+      });
+    }
+
+    return sendAuthResponse(res, 200, user);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   signup,
   login,
   refreshToken,
-  getMe
+  getMe,
+  googleSignIn
 };

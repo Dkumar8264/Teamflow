@@ -8,8 +8,6 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   onAuthStateChanged,
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
 } from "firebase/auth";
 
 export { auth };
@@ -37,17 +35,14 @@ export const doSendEmailVerification = async () => {
 };
 
 export const doGoogleSignIn = async () => {
-  return signInWithPopup(auth, provider);
-};
-
-export const doPhoneSignIn = async (phoneNumber) => {
-  const appVerifier = window.recaptchaVerifier;
-  return signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-};
-
-export const doVerifyPhoneNumber = async (phoneNumber) => {
-  window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('sign-in-button');
-  return signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
+  try {
+    return await signInWithPopup(auth, provider);
+  } catch (error) {
+    // Preserve the Firebase error code so callers can map it to readable copy.
+    const wrapped = new Error(error.message);
+    wrapped.code = error.code;
+    throw wrapped;
+  }
 };
 
 export const onAuthStateChangedListener = (callback) => {

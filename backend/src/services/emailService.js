@@ -106,14 +106,41 @@ const sendWithResend = async (message) => {
 };
 
 const sendInvitationEmail = async (payload) => {
-  const message = buildInvitationEmail(payload);
+  return deliver(buildInvitationEmail(payload));
+};
 
+/**
+ * Shared delivery path: Resend API first (Render blocks outbound SMTP on free plans),
+ * SMTP second, and a no-op "preview" mode when neither is configured.
+ *
+ * `sensitive: true` suppresses logging of the rendered body in preview mode, because
+ * verification and password-reset messages embed single-use tokens that must not end
+ * up in a log aggregator. In development the link is still printed so local flows are
+ * testable without an email provider.
+ */
+const deliver = async (message, { sensitive = false } = {}) => {
   if (hasResendConfig()) {
     return sendWithResend(message);
   }
 
   if (!hasSmtpConfig()) {
-    console.info('[email] Email provider not configured; invitation email preview generated', {
+    if (sensitive) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[email] No email provider configured; security email NOT sent', {
+          to: message.to,
+          subject: message.subject
+        });
+      } else {
+        console.info('[email] Preview mode — open this link locally:', {
+          to: message.to,
+          link: message.previewLink
+        });
+      }
+
+      return { delivered: false, mode: 'preview' };
+    }
+
+    console.info('[email] Email provider not configured; email preview generated', {
       to: message.to,
       subject: message.subject
     });
@@ -133,6 +160,88 @@ const sendInvitationEmail = async (payload) => {
     mode: 'smtp',
     messageId: info.messageId
   };
+};
+
+const buildActionEmail = ({ email, name, subject, heading, bodyLines, ctaLabel, link, footer }) => {
+  const safeName = escapeHtml(name || 'there');
+  const safeLink = escapeHtml(link);
+  const text = [
+    `Hi ${name || 'there'},`,
+    '',
+    ...bodyLines,
+    '',
+    link,
+    '',
+    footer,
+    '',
+    'TeamFlow'
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+      <h2>${escapeHtml(heading)}</h2>
+      <p>Hi ${safeName},</p>
+      ${bodyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join('')}
+      <p>
+        <a href="${safeLink}" style="display: inline-block; background: #d4ff00; border: 2px solid #111827; border-radius: 999px; color: #111827; font-weight: 700; padding: 10px 16px; text-decoration: none;">
+          ${escapeHtml(ctaLabel)}
+        </a>
+      </p>
+      <p style="font-size: 13px; color: #4b5563;">${safeLink}</p>
+      <p style="font-size: 13px; color: #4b5563;">${escapeHtml(footer)}</p>
+    </div>
+  `;
+
+  return {
+    from: process.env.MAIL_FROM || process.env.SMTP_USER || 'TeamFlow <onboarding@resend.dev>',
+    to: email,
+    subject,
+    text,
+    html,
+    previewLink: link
+  };
+};
+
+const sendVerificationEmail = async ({ email, name, token }) => {
+  const link = `${getClientUrl()}/verify-email?token=${encodeURIComponent(token)}`;
+
+  return deliver(
+    buildActionEmail({
+      email,
+      name,
+      subject: 'Verify your TeamFlow email address',
+      heading: 'Confirm your email',
+      bodyLines: [
+        'Confirm this email address to finish setting up your TeamFlow account.',
+        'This link expires in 24 hours.'
+      ],
+      ctaLabel: 'Verify email',
+      link,
+      footer: 'If you did not create a TeamFlow account, you can ignore this email.'
+    }),
+    { sensitive: true }
+  );
+};
+
+const sendPasswordResetEmail = async ({ email, name, token, expiresInMinutes }) => {
+  const link = `${getClientUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+
+  return deliver(
+    buildActionEmail({
+      email,
+      name,
+      subject: 'Reset your TeamFlow password',
+      heading: 'Reset your password',
+      bodyLines: [
+        'Use the button below to choose a new password.',
+        `This link can only be used once and expires in ${expiresInMinutes} minutes.`
+      ],
+      ctaLabel: 'Reset password',
+      link,
+      footer: 'If you did not request a password reset, ignore this email — your password has not changed.'
+    }),
+    { sensitive: true }
+  );
 };
 
 const verifyEmailTransport = async () => {
@@ -167,5 +276,7 @@ module.exports = {
   hasResendConfig,
   hasSmtpConfig,
   verifyEmailTransport,
-  sendInvitationEmail
+  sendInvitationEmail,
+  sendVerificationEmail,
+  sendPasswordResetEmail
 };
