@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
-import { auth, doCreateUserWithEmailAndPassword, doSignInWithEmailAndPassword, doSignOut, doGoogleSignIn, doPhoneSignIn, onAuthStateChangedListener } from './services/firebaseAuth';
+import { doCreateUserWithEmailAndPassword, doSignInWithEmailAndPassword, doSignOut, doGoogleSignIn, onAuthStateChangedListener } from './services/firebaseAuth';
 
 const features = ['Projects', 'Team roles', 'Kanban tasks', 'Comments', 'Notifications', 'Real-time sync'];
 const localApiBaseUrl = 'http://127.0.0.1:5000/api';
@@ -171,17 +171,15 @@ function App() {
   });
   useEffect(() => {
     const unsub = onAuthStateChangedListener((user) => {
-      if (user) {
-        setAuth({
-          uid: user.uid,
-          displayName: user.displayName,
-          email: user.email,
-          photoURL: user.photoURL,
-          isAnonymous: user.isAnonymous || false
+      if (!user) {
+        setAuth((current) => {
+          if (getAuthToken(current)) {
+            return current;
+          }
+
+          window.localStorage.removeItem(authStorageKey);
+          return null;
         });
-      } else {
-        setAuth(null);
-        window.localStorage.removeItem(authStorageKey);
       }
     });
     return () => unsub();
@@ -196,12 +194,7 @@ function App() {
   const [toast, setToast] = React.useState('SYSTEM ONLINE');
   const [isLoading, setIsLoading] = React.useState(false);
   const token = getAuthToken(auth);
-  const currentUser = auth?.user ? {
-    uid: auth.uid,
-    displayName: auth.displayName,
-    email: auth.email,
-    photoURL: auth.photoURL
-  } : null;
+  const currentUser = auth?.user && token ? auth.user : null;
 
   const activeProject = projects.find((project) => project.id === activeProjectId) || projects[0];
 
@@ -269,34 +262,31 @@ function App() {
   };
 
   const signup = async ({ name, email, password }) => {
-  const result = await doCreateUserWithEmailAndPassword(email, password);
-  await result.user.sendEmailVerification();
-  const payload = {
-    token: result.user.accessToken,
-    refreshToken: result.user.refreshToken,
-    user: {
-      uid: result.user.uid,
-      name,
-      email: result.user.email
+    try {
+      await doCreateUserWithEmailAndPassword(email, password);
+    } catch (error) {
+      if (error.code !== 'auth/email-already-in-use') {
+        throw error;
+      }
     }
+
+    const payload = await apiRequest('/auth/signup', {
+      method: 'POST',
+      body: { name, email, password }
+    });
+    const nextAuth = saveAuth(payload);
+
+    showToast(`Welcome ${payload.user.name}`);
+    await loadWorkspace(nextAuth.token);
+    return { ok: true };
   };
-  const nextAuth = saveAuth(payload);
-  showToast(`Welcome ${payload.user.name}`);
-  await loadWorkspace(nextAuth.token);
-  return { ok: true };
-};
 
   const login = async ({ email, password }) => {
-    const result = await doSignInWithEmailAndPassword(email, password);
-    const payload = {
-      token: result.user.accessToken,
-      refreshToken: result.user.refreshToken,
-      user: {
-        uid: result.user.uid,
-        name: result.user.displayName,
-        email: result.user.email
-      }
-    };
+    await doSignInWithEmailAndPassword(email, password);
+    const payload = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: { email, password }
+    });
     const nextAuth = saveAuth(payload);
 
     showToast(`Welcome back ${payload.user.name}`);
