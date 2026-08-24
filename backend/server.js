@@ -7,6 +7,7 @@ const { errorHandler, notFound } = require('./src/middleware/errorHandler');
 const AppError = require('./src/utils/AppError');
 const authRoutes = require('./src/routes/auth');
 const invitationRoutes = require('./src/routes/invitations');
+const notificationRoutes = require('./src/routes/notifications');
 const projectRoutes = require('./src/routes/projects');
 const taskRoutes = require('./src/routes/tasks');
 
@@ -93,6 +94,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/invitations', invitationRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 

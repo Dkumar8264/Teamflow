@@ -1,5 +1,6 @@
 const Project = require('../models/Project');
 const Task = require('../models/Task');
+const User = require('../models/User');
 const AppError = require('../utils/AppError');
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
@@ -150,7 +151,14 @@ const addProjectMember = async (req, res, next) => {
       throw new AppError('Member already exists in project', 409);
     }
 
-    project.members.push({ name, email, role });
+    const user = await User.findOne({ email }).select('_id name email');
+
+    project.members.push({
+      user: user?._id || null,
+      name: user?.name || name,
+      email,
+      role
+    });
     await project.save();
 
     return res.status(201).json({

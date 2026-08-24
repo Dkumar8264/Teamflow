@@ -64,6 +64,7 @@ const apiRequest = async (path, { body, method = 'GET', token } = {}) => {
 };
 
 const getDocumentId = (item) => item?._id || item?.id;
+const getReferenceId = (item) => (typeof item === 'string' ? item : item?._id || item?.id || item?.uid);
 
 const getProjectProgress = (projectId, tasks) => {
   const projectTasks = tasks.filter((task) => getDocumentId(task.project) === projectId || task.project === projectId);
@@ -78,6 +79,7 @@ const getProjectProgress = (projectId, tasks) => {
 
 const normalizeMember = (member) => ({
   id: getDocumentId(member),
+  userId: getReferenceId(member.user),
   name: member.name,
   email: member.email,
   role: member.role
@@ -99,6 +101,13 @@ const normalizeTask = (task) => ({
   title: task.title,
   project: task.project?.name || task.projectName || 'Project',
   projectId: getDocumentId(task.project) || task.project,
+  assignee: task.assignedTo
+    ? {
+        id: getReferenceId(task.assignedTo),
+        name: task.assignedTo.name || 'Assigned',
+        email: task.assignedTo.email || ''
+      }
+    : null,
   status: task.status || 'todo',
   priority: task.priority || 'medium',
   createdAt: task.createdAt,
@@ -181,6 +190,7 @@ function App() {
   const [tasks, setTasks] = React.useState([]);
   const [columns, setColumns] = React.useState(buildColumns([]));
   const [invitations, setInvitations] = React.useState([]);
+  const [notifications, setNotifications] = React.useState([]);
   const [roadmap, setRoadmap] = React.useState(initialRoadmap);
   const [activeProjectId, setActiveProjectId] = React.useState(null);
   const [toast, setToast] = React.useState('SYSTEM ONLINE');
@@ -211,9 +221,10 @@ function App() {
     setIsLoading(true);
 
     try {
-      const [projectsPayload, tasksPayload] = await Promise.all([
+      const [projectsPayload, tasksPayload, notificationsPayload] = await Promise.all([
         apiRequest('/projects', { token: authToken }),
-        apiRequest('/tasks', { token: authToken })
+        apiRequest('/tasks', { token: authToken }),
+        apiRequest('/notifications', { token: authToken })
       ]);
       const nextTasks = tasksPayload.tasks || [];
       const nextProjects = (projectsPayload.projects || []).map((project) => normalizeProject(project, nextTasks));
@@ -221,6 +232,7 @@ function App() {
       setTasks(nextTasks);
       setColumns(buildColumns(nextTasks));
       setProjects(nextProjects);
+      setNotifications(notificationsPayload.notifications || []);
       setActiveProjectId((current) => current || nextProjects[0]?.id || null);
       showToast('Workspace synced');
     } catch (error) {
@@ -298,6 +310,7 @@ function App() {
     setProjects([]);
     setTasks([]);
     setColumns(buildColumns([]));
+    setNotifications([]);
     setActiveProjectId(null);
     window.localStorage.removeItem(authStorageKey);
     showToast('Logged out');
@@ -419,7 +432,7 @@ function App() {
     }
   };
 
-  const addTask = async ({ title }) => {
+  const addTask = async ({ assignedTo, title }) => {
     if (!activeProject) {
       showToast('Create a project first');
       return false;
@@ -429,14 +442,18 @@ function App() {
       const payload = await apiRequest('/tasks', {
         method: 'POST',
         token,
-        body: { title, projectId: activeProject.id, status: 'todo' }
+        body: { title, assignedTo: assignedTo || null, projectId: activeProject.id, status: 'todo' }
       });
       const nextTasks = [payload.task, ...tasks];
+      const assignee = activeProject.team.find((member) => member.userId === assignedTo);
 
       setTasks(nextTasks);
       setColumns(buildColumns(nextTasks));
       setProjects((current) => current.map((project) => normalizeProject(project, nextTasks)));
-      showToast(`${title} added`);
+      if (payload.notification && getReferenceId(payload.notification.recipient) === getReferenceId(currentUser)) {
+        setNotifications((current) => [payload.notification, ...current]);
+      }
+      showToast(assignee ? `${title} assigned to ${assignee.name}` : `${title} added`);
       return true;
     } catch (error) {
       showToast(error.message || 'Task add failed');
@@ -559,6 +576,7 @@ function App() {
               features={features}
               invitations={invitations}
               moveTaskToColumn={moveTaskToColumn}
+              notifications={notifications}
               onAddTask={addTask}
               projects={projects}
               setActiveProjectId={setActiveProjectId}
@@ -814,6 +832,7 @@ function DashboardPage({
   features,
   invitations,
   moveTaskToColumn,
+  notifications,
   onAddTask,
   projects,
   setActiveProjectId,
@@ -973,6 +992,7 @@ function DashboardPage({
           </div>
 
           <InvitePanel invitations={invitations} />
+          <NotificationsPanel notifications={notifications} />
         </aside>
 
         <Board columns={columns} moveTaskToColumn={moveTaskToColumn} onNewTask={() => setPanel('task')} />
@@ -985,7 +1005,7 @@ function DashboardPage({
       </section>
 
       {panel === 'task' && (
-        <TaskModal onClose={() => setPanel(null)} onSubmit={async (payload) => {
+        <TaskModal activeProject={activeProject} onClose={() => setPanel(null)} onSubmit={async (payload) => {
           const saved = await onAddTask(payload);
           if (saved) {
             setPanel(null);
@@ -1205,7 +1225,7 @@ function BoardPage({ activeProject, columns, deleteTask, moveTaskToColumn, onAdd
       </section>
 
       {panel === 'task' && (
-        <TaskModal onClose={() => setPanel(null)} onSubmit={async (payload) => {
+        <TaskModal activeProject={activeProject} onClose={() => setPanel(null)} onSubmit={async (payload) => {
           const saved = await onAddTask(payload);
           if (saved) {
             setPanel(null);
@@ -1399,6 +1419,7 @@ function TaskCard({ columnId, columns, deleteTask, moveTaskToColumn, task }) {
     <div className="tf-task">
       <strong>{task.title}</strong>
       <span>{task.project}</span>
+      {task.assignee && <span>Assigned to {task.assignee.name}</span>}
       <div className="tf-task-actions">
         <label>
           Status
@@ -1436,6 +1457,33 @@ function InvitePanel({ compact = false, invitations }) {
             {invite.emailMode && <em>{invite.emailMode === 'smtp' ? 'Email sent' : 'Email preview'}</em>}
           </article>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function NotificationsPanel({ notifications }) {
+  return (
+    <div className="tf-panel">
+      <div className="tf-panel-head">
+        <h2>Notifications</h2>
+        <span>{notifications.length}</span>
+      </div>
+      <div className="tf-invite-list">
+        {notifications.length > 0 ? (
+          notifications.map((notification) => (
+            <article className="tf-invite" key={getDocumentId(notification)}>
+              <strong>{notification.type === 'task_assigned' ? 'Task assigned' : 'Notification'}</strong>
+              <span>{notification.actor?.name || 'TeamFlow'}</span>
+              <p>{notification.message}</p>
+            </article>
+          ))
+        ) : (
+          <article className="tf-invite">
+            <strong>No notifications</strong>
+            <p>Assigned tasks will appear here.</p>
+          </article>
+        )}
       </div>
     </div>
   );
@@ -1498,8 +1546,9 @@ function MemberModal({ onClose, onSubmit, projectName }) {
   );
 }
 
-function TaskModal({ onClose, onSubmit }) {
+function TaskModal({ activeProject, onClose, onSubmit }) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const assignableMembers = (activeProject?.team || []).filter((member) => member.userId);
 
   return (
     <Modal>
@@ -1508,16 +1557,28 @@ function TaskModal({ onClose, onSubmit }) {
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
           const title = String(formData.get('title') || '').trim();
+          const assignedTo = String(formData.get('assignedTo') || '').trim();
 
           if (title) {
             setIsSubmitting(true);
-            await onSubmit({ title });
+            await onSubmit({ assignedTo, title });
             setIsSubmitting(false);
           }
         }}
       >
         <h2>Add task</h2>
         <Field label="Task title" name="title" placeholder="Create task" />
+        <label className="tf-field">
+          Assign to
+          <select name="assignedTo" defaultValue="">
+            <option value="">Unassigned</option>
+            {assignableMembers.map((member) => (
+              <option key={member.userId} value={member.userId}>
+                {member.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <PanelActions disabled={isSubmitting} onClose={onClose} submitLabel={isSubmitting ? 'Adding...' : 'Add task'} />
       </form>
     </Modal>

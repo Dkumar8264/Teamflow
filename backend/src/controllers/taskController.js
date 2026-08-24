@@ -1,4 +1,5 @@
 const Project = require('../models/Project');
+const Notification = require('../models/Notification');
 const Task = require('../models/Task');
 const AppError = require('../utils/AppError');
 const { getAccessibleProject } = require('./projectController');
@@ -56,22 +57,49 @@ const createTask = async (req, res, next) => {
 
     const project = await getAccessibleProject(projectId, req.user);
 
+    const assignedTo = req.body.assignedTo ? String(req.body.assignedTo).trim() : null;
+
+    if (assignedTo) {
+      const isProjectMember = project.members.some((member) => member.user?.toString() === assignedTo);
+
+      if (!isProjectMember) {
+        throw new AppError('Task assignee must be a registered project member', 400);
+      }
+    }
+
     const task = await Task.create({
       title,
       description: String(req.body.description || '').trim(),
       project: project._id,
       createdBy: req.user._id,
-      assignedTo: req.body.assignedTo || null,
+      assignedTo,
       status: req.body.status || 'todo',
       priority: req.body.priority || 'medium',
       dueDate: req.body.dueDate || null
     });
 
-    await task.populate('project', 'name');
+    let notification = null;
+
+    if (assignedTo) {
+      notification = await Notification.create({
+        recipient: assignedTo,
+        actor: req.user._id,
+        type: 'task_assigned',
+        message: `You have this task: ${title}`,
+        entity: task._id,
+        entityType: 'task'
+      });
+    }
+
+    await task.populate([
+      { path: 'project', select: 'name' },
+      { path: 'assignedTo', select: 'name email' }
+    ]);
 
     return res.status(201).json({
       success: true,
-      task
+      task,
+      notification
     });
   } catch (error) {
     return next(error);
