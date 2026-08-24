@@ -1,38 +1,19 @@
-import { auth } from "./firebaseConfig";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  sendPasswordResetEmail,
-  sendEmailVerification,
-  signInWithPopup,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-} from "firebase/auth";
+import { auth } from './firebaseConfig';
+import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 
 export { auth };
 
+/**
+ * Firebase's only remaining job in this app is brokering the Google identity.
+ *
+ * Email/password accounts, email verification, and password resets are all owned by the
+ * backend, which holds the single source of truth for users and issues the session the
+ * app actually runs on. The Firebase email/password and email-sending helpers were
+ * deliberately removed: calling them would create a second, parallel account store the
+ * backend knows nothing about, and would send Firebase-branded emails whose links do
+ * not go through our verification or reset endpoints.
+ */
 export const provider = new GoogleAuthProvider();
-
-export const doCreateUserWithEmailAndPassword = async (email, password) => {
-  return createUserWithEmailAndPassword(auth, email, password);
-};
-
-export const doSignInWithEmailAndPassword = async (email, password) => {
-  return signInWithEmailAndPassword(auth, email, password);
-};
-
-export const doSignOut = async () => {
-  return signOut(auth);
-};
-
-export const doSendPasswordResetEmail = async (email) => {
-  return sendPasswordResetEmail(auth, email);
-};
-
-export const doSendEmailVerification = async () => {
-  return sendEmailVerification(auth.currentUser);
-};
 
 export const doGoogleSignIn = async () => {
   try {
@@ -45,10 +26,4 @@ export const doGoogleSignIn = async () => {
   }
 };
 
-export const onAuthStateChangedListener = (callback) => {
-  return onAuthStateChanged(auth, callback);
-};
-
-export const isUserSignedIn = () => {
-  return auth.currentUser !== null;
-};
+export const doSignOut = async () => signOut(auth);

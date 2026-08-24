@@ -14,11 +14,20 @@ services:
         value: https://teamflow-dusky.vercel.app
       - key: MONGO_URI
         sync: false
+      # Must be >= 32 chars of high-entropy random data. The server refuses to boot in
+      # production on a short or placeholder value.
       - key: JWT_SECRET
         sync: false
-      - key: JWT_REFRESH_SECRET
-        sync: false
+      # Short-lived access tokens; refresh tokens carry the long session.
       - key: JWT_EXPIRES_IN
-        value: 7d
-      - key: JWT_REFRESH_EXPIRES_IN
-        value: 7d
+        value: 15m
+      # Refresh tokens are opaque random values stored hashed in MongoDB and rotated on
+      # every use, so they are not JWTs and need no signing secret.
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: 7
+      # Service account JSON (raw or base64) used to verify Google sign-in ID tokens.
+      # Contains a private key — set it in the Render dashboard, never in this file.
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
