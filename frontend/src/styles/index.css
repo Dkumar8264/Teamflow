@@ -907,7 +907,6 @@ button:disabled {
   max-width: 1240px;
   margin: 0 auto;
   min-height: calc(100vh - 156px);
-  height: calc(100vh - 156px);
   padding: clamp(40px, 6vh, 84px) clamp(18px, 4vw, 56px);
 }
 
@@ -996,7 +995,6 @@ button:disabled {
   padding: clamp(30px, 3vw, 40px);
   max-width: 480px;
   width: 100%;
-  max-height: calc(100vh - 156px);
 }
 
 .tf-auth-card-head {
