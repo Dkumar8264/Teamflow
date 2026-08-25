@@ -901,9 +901,9 @@ button:disabled {
 
 .tf-auth-page {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(400px, 1fr) minmax(0, 1fr);
   align-items: center;
-  gap: clamp(32px, 5vw, 72px);
+  gap: clamp(24px, 5vw, 60px);
   max-width: 1240px;
   margin: 0 auto;
   min-height: calc(100vh - 156px);
@@ -923,7 +923,7 @@ button:disabled {
   color: #fff;
   /* Capped well below the old 132px: at that size a two-word line overflowed the
      column on a 13" screen and disappeared behind the card. */
-  font-size: clamp(44px, 6.4vw, 88px);
+  font-size: clamp(32px, 6.4vw, 88px);
   font-weight: 1000;
   letter-spacing: -0.02em;
   line-height: 0.94;
