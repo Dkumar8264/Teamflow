@@ -912,21 +912,28 @@ button:disabled {
 }
 
 .tf-auth-copy {
-  /* The headline is set in a very heavy face at a large size; without an explicit
-     min-width of 0 the grid track refuses to shrink below the longest word and the
-     column slides under the card. */
+  /* The headline below is sized in `cqw`, which makes this column the reference box
+     instead of the viewport. Sizing off `vw` is what let a wide word overflow the track
+     and break mid-word: the viewport can be roomy while this column is not. */
+  container-type: inline-size;
+
+  /* Without an explicit min-width of 0 the grid track refuses to shrink below the
+     longest word and the column slides under the card. */
   min-width: 0;
 }
 
 .tf-auth-copy h1 {
   margin: 16px 0 0;
   color: #fff;
-  /* Capped well below the old 132px: at that size a two-word line overflowed the
-     column on a 13" screen and disappeared behind the card. */
-  font-size: clamp(32px, 6.4vw, 88px);
+  /* Fallback first, for engines without container query units. The cqw rule below wins
+     everywhere else: 11cqw keeps the longest word ("WORKSPACE.", roughly 6.3em in this
+     weight) inside the column at every width, so it never has to break. */
+  font-size: clamp(32px, 6vw, 88px);
+  font-size: clamp(32px, 13cqw, 88px);
   font-weight: 1000;
   letter-spacing: -0.02em;
   line-height: 0.94;
+  /* Last-resort net only — with the sizing above it is not expected to trigger. */
   overflow-wrap: break-word;
   text-transform: uppercase;
 }
