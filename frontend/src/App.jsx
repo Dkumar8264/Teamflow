@@ -605,29 +605,28 @@ function App() {
     }
   };
 
-  // Shown while the refresh cookie is being exchanged. Rendering the routes here would
-  // briefly redirect a signed-in user to /signup before the token arrives.
-  if (isRestoringSession) {
-    return (
-      <main className="tf-page">
-        <AppHeader currentUser={null} onLogout={logout} onToast={showToast} />
-        <section className="tf-empty">
-          <h1>Restoring session.</h1>
-        </section>
-      </main>
-    );
-  }
-
   if (currentUser && isLoading && projects.length === 0) {
     return (
       <main className="tf-page">
         <AppHeader currentUser={currentUser} onLogout={logout} onToast={showToast} />
-        <section className="tf-empty">
-          <h1>Loading workspace.</h1>
-        </section>
+        <LoadingSplash />
       </main>
     );
   }
+
+  /*
+    Exchanging the refresh cookie is only a reason to hold back the *protected* routes:
+    rendering one mid-restore would bounce a signed-in user to /signup before the token
+    arrives. The public auth screens are what a signed-out visitor came for, so they render
+    straight away and redirect on their own if a session does turn up.
+  */
+  const requireSession = (element) => {
+    if (currentUser) {
+      return element;
+    }
+
+    return isRestoringSession ? <LoadingSplash /> : <Navigate replace to="/signup" />;
+  };
 
   return (
     <main className="tf-page">
@@ -674,50 +673,48 @@ function App() {
         <Route path="/reset-password" element={<ResetPasswordPage onResetPassword={resetPassword} />} />
         <Route
           path="/"
-          element={currentUser ? (activeProject ? (
-            <DashboardPage
-              activeProject={activeProject}
-              columns={columns}
-              features={features}
-              invitations={invitations}
-              moveTaskToColumn={moveTaskToColumn}
-              notifications={notifications}
-              onAddTask={addTask}
-              projects={projects}
-              setActiveProjectId={setActiveProjectId}
-              showToast={showToast}
-              tasks={tasks}
-              toast={toast}
-            />
-          ) : (
-            <Navigate to="/projects" replace />
-          )
-          ) : (
-            <Navigate to="/signup" replace />
+          element={requireSession(
+            activeProject ? (
+              <DashboardPage
+                activeProject={activeProject}
+                columns={columns}
+                features={features}
+                invitations={invitations}
+                moveTaskToColumn={moveTaskToColumn}
+                notifications={notifications}
+                onAddTask={addTask}
+                projects={projects}
+                setActiveProjectId={setActiveProjectId}
+                showToast={showToast}
+                tasks={tasks}
+                toast={toast}
+              />
+            ) : (
+              <Navigate replace to="/projects" />
+            )
           )}
         />
         <Route
           path="/board"
-          element={currentUser ? (activeProject ? (
-            <BoardPage
-              activeProject={activeProject}
-              columns={columns}
-              deleteTask={deleteTask}
-              moveTaskToColumn={moveTaskToColumn}
-              onAddTask={addTask}
-              projects={projects}
-              toast={toast}
-            />
-          ) : (
-            <Navigate to="/projects" replace />
-          )
-          ) : (
-            <Navigate to="/signup" replace />
+          element={requireSession(
+            activeProject ? (
+              <BoardPage
+                activeProject={activeProject}
+                columns={columns}
+                deleteTask={deleteTask}
+                moveTaskToColumn={moveTaskToColumn}
+                onAddTask={addTask}
+                projects={projects}
+                toast={toast}
+              />
+            ) : (
+              <Navigate replace to="/projects" />
+            )
           )}
         />
         <Route
           path="/projects"
-          element={currentUser ? (
+          element={requireSession(
             <ProjectsPage
               activeProjectId={activeProjectId}
               invitations={invitations}
@@ -729,32 +726,29 @@ function App() {
               setActiveProjectId={setActiveProjectId}
               toast={toast}
             />
-          ) : (
-            <Navigate to="/signup" replace />
           )}
         />
         <Route
           path="/team"
-          element={currentUser ? (activeProject ? (
-            <TeamPage
-              activeProjectId={activeProjectId}
-              invitations={invitations}
-              onDeleteMember={deleteMember}
-              onInviteMember={inviteMember}
-              projects={projects}
-              setActiveProjectId={setActiveProjectId}
-              toast={toast}
-            />
-          ) : (
-            <Navigate to="/projects" replace />
-          )
-          ) : (
-            <Navigate to="/signup" replace />
+          element={requireSession(
+            activeProject ? (
+              <TeamPage
+                activeProjectId={activeProjectId}
+                invitations={invitations}
+                onDeleteMember={deleteMember}
+                onInviteMember={inviteMember}
+                projects={projects}
+                setActiveProjectId={setActiveProjectId}
+                toast={toast}
+              />
+            ) : (
+              <Navigate replace to="/projects" />
+            )
           )}
         />
         <Route
           path="/roadmap"
-          element={currentUser ? (
+          element={requireSession(
             <RoadmapPage
               onAddRoadmapItem={addRoadmapItem}
               onDeleteRoadmapItem={deleteRoadmapItem}
@@ -762,8 +756,6 @@ function App() {
               roadmap={roadmap}
               toast={toast}
             />
-          ) : (
-            <Navigate to="/signup" replace />
           )}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -819,10 +811,56 @@ function AppHeader({ currentUser, onLogout, onToast }) {
 }
 
 /**
+ * The interstitial for both waits the app can hit before it has anything to show: the
+ * refresh-cookie exchange on a protected route, and the very first workspace fetch.
+ * Deliberately wordless — a full page holding a single line of text reads as an error,
+ * which is the opposite of the "this is working, give it a second" signal it should send.
+ */
+function LoadingSplash() {
+  return (
+    <section aria-busy="true" className="tf-splash" role="status">
+      <span aria-hidden="true" className="tf-splash-bars">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span className="tf-visually-hidden">Loading</span>
+    </section>
+  );
+}
+
+/**
+ * Google's own mark rather than a letter in a coloured circle: it is what people scan the
+ * page for, and Google's branding terms require it on a "Continue with Google" button.
+ */
+function GoogleMark() {
+  return (
+    <svg aria-hidden="true" className="tf-google-mark" focusable="false" viewBox="0 0 48 48">
+      <path
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+        fill="#4285F4"
+      />
+      <path
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+        fill="#34A853"
+      />
+      <path
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
+/**
  * Shared Google button. Takes its disabled state from the host page so it greys out
  * while the email/password form is submitting, and vice versa.
  */
-function GoogleButton({ disabled, label, onClick }) {
+function GoogleButton({ busy = false, disabled, label, onClick }) {
   return (
     <button
       className="tf-google-button"
@@ -830,19 +868,103 @@ function GoogleButton({ disabled, label, onClick }) {
       onClick={onClick}
       type="button"
     >
-      <span aria-hidden="true" className="tf-google-mark">
-        G
-      </span>
-      {label}
+      {busy ? <span aria-hidden="true" className="tf-spinner" /> : <GoogleMark />}
+      <span>{label}</span>
     </button>
   );
 }
 
-function AuthDivider() {
+function AuthDivider({ label = 'or' }) {
   return (
     <p className="tf-auth-divider">
-      <span>or</span>
+      <span>{label}</span>
     </p>
+  );
+}
+
+/**
+ * Split layout shared by every auth screen: pitch on the left, card on the right. Holding
+ * it in one component is what keeps the five screens from drifting apart visually.
+ */
+function AuthLayout({ children, eyebrow, highlights, lead, title }) {
+  return (
+    <section className="tf-auth-page">
+      <div className="tf-auth-copy">
+        <p className="tf-eyebrow">{eyebrow}</p>
+        <h1>{title}</h1>
+        <p className="tf-auth-lead">{lead}</p>
+        {highlights ? (
+          <ul className="tf-auth-highlights">
+            {highlights.map((item) => (
+              <li key={item}>
+                <span aria-hidden="true">✓</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function AuthCardHead({ subtitle, title }) {
+  return (
+    <div className="tf-auth-card-head">
+      <h2>{title}</h2>
+      {subtitle ? <p>{subtitle}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * Password input with a reveal toggle. The toggle flips the input `type` rather than
+ * holding the value in state, so the field stays uncontrolled and the surrounding forms
+ * keep reading it straight off FormData.
+ */
+function PasswordField({ action, autoComplete, disabled = false, hint, label, name, placeholder }) {
+  const [isVisible, setIsVisible] = React.useState(false);
+  const inputId = `tf-field-${name}`;
+
+  return (
+    <div className="tf-field">
+      <span className="tf-field-head">
+        <label className="tf-field-label" htmlFor={inputId}>
+          {label}
+        </label>
+        {action}
+      </span>
+      <span className="tf-field-control">
+        <input
+          autoComplete={autoComplete}
+          disabled={disabled}
+          id={inputId}
+          name={name}
+          placeholder={placeholder}
+          type={isVisible ? 'text' : 'password'}
+        />
+        <button
+          aria-label={isVisible ? 'Hide password' : 'Show password'}
+          className="tf-reveal"
+          disabled={disabled}
+          onClick={() => setIsVisible((current) => !current)}
+          type="button"
+        >
+          {isVisible ? 'Hide' : 'Show'}
+        </button>
+      </span>
+      {hint ? <p className="tf-field-hint">{hint}</p> : null}
+    </div>
+  );
+}
+
+function AuthSubmit({ busy, disabled, children }) {
+  return (
+    <button className="tf-auth-submit" disabled={disabled} type="submit">
+      {busy ? <span aria-hidden="true" className="tf-spinner tf-spinner-dark" /> : null}
+      <span>{children}</span>
+    </button>
   );
 }
 
@@ -895,25 +1017,45 @@ function SignupPage({ onGoogleSignIn, onSignup }) {
   };
 
   return (
-    <section className="tf-auth-page">
-      <div className="tf-auth-copy">
-        <p className="tf-eyebrow">START WITH SIGNUP</p>
-        <h1>CREATE ACCOUNT.</h1>
-        <p>Sign up with Google for instant access, or use email and confirm your address.</p>
-      </div>
+    <AuthLayout
+      highlights={[
+        'Board, roadmap and team in one workspace',
+        'Invite teammates by email in seconds',
+        'No credit card, no setup call'
+      ]}
+      lead="Continue with Google for instant access, or sign up with email and confirm your address."
+      title={
+        <>
+          Create your
+          <br />
+          <em>workspace.</em>
+        </>
+      }
+    >
+      <form className="tf-auth-card" noValidate onSubmit={handleSubmit}>
+        <AuthCardHead subtitle="Free while your team is finding its feet." title="Sign up" />
 
-      <form className="tf-auth-card" onSubmit={handleSubmit}>
-        <h2>Sign up</h2>
-        {error && <p className="tf-form-error">{error}</p>}
+        {error ? (
+          <p className="tf-form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
 
         <GoogleButton
+          busy={isGoogleBusy}
           disabled={isBusy}
-          label={isGoogleBusy ? 'Opening Google...' : 'Continue with Google'}
+          label={isGoogleBusy ? 'Opening Google' : 'Continue with Google'}
           onClick={handleGoogle}
         />
-        <AuthDivider />
+        <AuthDivider label="or sign up with email" />
 
-        <Field autoComplete="name" disabled={isBusy} label="Full name" name="name" placeholder="Deepak Kumar" />
+        <Field
+          autoComplete="name"
+          disabled={isBusy}
+          label="Full name"
+          name="name"
+          placeholder="Deepak Kumar"
+        />
         <Field
           autoComplete="email"
           disabled={isBusy}
@@ -922,27 +1064,27 @@ function SignupPage({ onGoogleSignIn, onSignup }) {
           placeholder="deepak@example.com"
           type="email"
         />
-        <Field
+        <PasswordField
           autoComplete="new-password"
           disabled={isBusy}
+          hint="At least 8 characters. Longer beats complicated."
           label="Password"
           name="password"
-          placeholder="Minimum 8 characters"
-          type="password"
+          placeholder="Create a password"
         />
-        <div className="tf-form-actions">
-          <button className="tf-button tf-button-lime small" disabled={isBusy} type="submit">
-            {isSubmitting ? 'Creating...' : 'Create account'}
-          </button>
-          <Link className="tf-button tf-button-white small" to="/login">
-            Login
-          </Link>
-        </div>
+
+        <AuthSubmit busy={isSubmitting} disabled={isBusy}>
+          {isSubmitting ? 'Creating account' : 'Create account'}
+        </AuthSubmit>
+
         <p className="tf-auth-meta">
-          We email a verification link before your account is active.
+          We email a verification link before your account goes live.
+        </p>
+        <p className="tf-auth-switch">
+          Already have an account? <Link to="/login">Log in</Link>
         </p>
       </form>
-    </section>
+    </AuthLayout>
   );
 }
 
@@ -990,23 +1132,33 @@ function LoginPage({ onGoogleSignIn, onLogin }) {
   };
 
   return (
-    <section className="tf-auth-page">
-      <div className="tf-auth-copy">
-        <p className="tf-eyebrow">LOGIN TO TEAMFLOW</p>
-        <h1>WELCOME BACK.</h1>
-        <p>Continue with Google, or sign in with the email and password you registered.</p>
-      </div>
+    <AuthLayout
+      eyebrow="Welcome back"
+      lead="Continue with Google, or sign in with the email and password you registered."
+      title={
+        <>
+          Pick up where you
+          <br />
+          <em>left off.</em>
+        </>
+      }
+    >
+      <form className="tf-auth-card" noValidate onSubmit={handleSubmit}>
+        <AuthCardHead subtitle="Sign in to your workspace." title="Log in" />
 
-      <form className="tf-auth-card" onSubmit={handleSubmit}>
-        <h2>Login</h2>
-        {error && <p className="tf-form-error">{error}</p>}
+        {error ? (
+          <p className="tf-form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
 
         <GoogleButton
+          busy={isGoogleBusy}
           disabled={isBusy}
-          label={isGoogleBusy ? 'Opening Google...' : 'Continue with Google'}
+          label={isGoogleBusy ? 'Opening Google' : 'Continue with Google'}
           onClick={handleGoogle}
         />
-        <AuthDivider />
+        <AuthDivider label="or use your email" />
 
         <Field
           autoComplete="email"
@@ -1016,27 +1168,28 @@ function LoginPage({ onGoogleSignIn, onLogin }) {
           placeholder="deepak@example.com"
           type="email"
         />
-        <Field
+        <PasswordField
+          action={
+            <Link className="tf-field-action" to="/forgot-password">
+              Forgot?
+            </Link>
+          }
           autoComplete="current-password"
           disabled={isBusy}
           label="Password"
           name="password"
           placeholder="Your password"
-          type="password"
         />
-        <div className="tf-form-actions">
-          <button className="tf-button tf-button-lime small" disabled={isBusy} type="submit">
-            {isSubmitting ? 'Logging in...' : 'Login'}
-          </button>
-          <Link className="tf-button tf-button-white small" to="/signup">
-            Sign up
-          </Link>
-        </div>
-        <p className="tf-auth-meta">
-          <Link to="/forgot-password">Forgot your password?</Link>
+
+        <AuthSubmit busy={isSubmitting} disabled={isBusy}>
+          {isSubmitting ? 'Logging in' : 'Log in'}
+        </AuthSubmit>
+
+        <p className="tf-auth-switch">
+          New to TeamFlow? <Link to="/signup">Create an account</Link>
         </p>
       </form>
-    </section>
+    </AuthLayout>
   );
 }
 
@@ -1104,57 +1257,81 @@ function VerifyEmailPage({ onResend, onVerifyToken, pendingEmail }) {
   };
 
   return (
-    <section className="tf-auth-page">
-      <div className="tf-auth-copy">
-        <p className="tf-eyebrow">ONE STEP LEFT</p>
-        <h1>{status === 'failed' ? 'LINK EXPIRED.' : 'CHECK YOUR EMAIL.'}</h1>
-        <p>
-          {status === 'verifying'
-            ? 'Confirming your link. This only takes a moment.'
-            : 'We sent a verification link to your inbox. Open it to activate your account and sign in.'}
-        </p>
-      </div>
-
-      <div className="tf-auth-card">
-        <h2>Verify email</h2>
-        {error && <p className="tf-form-error">{error}</p>}
-        {notice && <p className="tf-form-note">{notice}</p>}
-
-        {status === 'verifying' ? (
-          <p className="tf-form-note">Verifying your link...</p>
+    <AuthLayout
+      eyebrow="One step left"
+      lead={
+        status === 'verifying'
+          ? 'Confirming your link. This only takes a moment.'
+          : 'We sent a verification link to your inbox. Open it to activate your account and sign in.'
+      }
+      title={
+        status === 'failed' ? (
+          <>
+            That link has
+            <br />
+            <em>expired.</em>
+          </>
         ) : (
           <>
-            <label className="tf-field">
-              Email address
-              <input
-                autoComplete="email"
-                disabled={isResending}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="deepak@example.com"
-                type="email"
-                value={email}
-              />
-            </label>
-            <div className="tf-form-actions">
-              <button
-                className="tf-button tf-button-lime small"
-                disabled={isResending}
-                onClick={handleResend}
-                type="button"
-              >
-                {isResending ? 'Sending...' : 'Resend email'}
-              </button>
-              <Link className="tf-button tf-button-white small" to="/login">
-                I have verified, continue
-              </Link>
+            Check your
+            <br />
+            <em>inbox.</em>
+          </>
+        )
+      }
+    >
+      <div className="tf-auth-card">
+        <AuthCardHead subtitle="Confirm your address to continue." title="Verify email" />
+        {error ? (
+          <p className="tf-form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {notice ? <p className="tf-form-note">{notice}</p> : null}
+
+        {status === 'verifying' ? (
+          <LoadingSplash />
+        ) : (
+          <>
+            <div className="tf-field">
+              <span className="tf-field-head">
+                <label className="tf-field-label" htmlFor="tf-field-verify-email">
+                  Email address
+                </label>
+              </span>
+              <span className="tf-field-control">
+                <input
+                  autoComplete="email"
+                  disabled={isResending}
+                  id="tf-field-verify-email"
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="deepak@example.com"
+                  type="email"
+                  value={email}
+                />
+              </span>
             </div>
+
+            <button
+              className="tf-auth-submit"
+              disabled={isResending}
+              onClick={handleResend}
+              type="button"
+            >
+              {isResending ? <span aria-hidden="true" className="tf-spinner tf-spinner-dark" /> : null}
+              <span>{isResending ? 'Sending' : 'Resend email'}</span>
+            </button>
+            <Link className="tf-auth-secondary" to="/login">
+              I have verified, continue
+            </Link>
+
             <p className="tf-auth-meta">
               Links expire after 24 hours. Requesting a new one invalidates the old link.
             </p>
           </>
         )}
       </div>
-    </section>
+    </AuthLayout>
   );
 }
 
@@ -1188,17 +1365,26 @@ function ForgotPasswordPage({ onRequestReset }) {
   };
 
   return (
-    <section className="tf-auth-page">
-      <div className="tf-auth-copy">
-        <p className="tf-eyebrow">PASSWORD HELP</p>
-        <h1>RESET ACCESS.</h1>
-        <p>Enter your email and we will send a link to choose a new password.</p>
-      </div>
+    <AuthLayout
+      eyebrow="Password help"
+      lead="Enter your email and we will send a link to choose a new password."
+      title={
+        <>
+          Reset your
+          <br />
+          <em>access.</em>
+        </>
+      }
+    >
+      <form className="tf-auth-card" noValidate onSubmit={handleSubmit}>
+        <AuthCardHead subtitle="We will email you a one-time link." title="Forgot password" />
+        {error ? (
+          <p className="tf-form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {notice ? <p className="tf-form-note">{notice}</p> : null}
 
-      <form className="tf-auth-card" onSubmit={handleSubmit}>
-        <h2>Forgot password</h2>
-        {error && <p className="tf-form-error">{error}</p>}
-        {notice && <p className="tf-form-note">{notice}</p>}
         <Field
           autoComplete="email"
           disabled={isSubmitting}
@@ -1207,17 +1393,17 @@ function ForgotPasswordPage({ onRequestReset }) {
           placeholder="deepak@example.com"
           type="email"
         />
-        <div className="tf-form-actions">
-          <button className="tf-button tf-button-lime small" disabled={isSubmitting} type="submit">
-            {isSubmitting ? 'Sending...' : 'Send reset link'}
-          </button>
-          <Link className="tf-button tf-button-white small" to="/login">
-            Back to login
-          </Link>
-        </div>
+
+        <AuthSubmit busy={isSubmitting} disabled={isSubmitting}>
+          {isSubmitting ? 'Sending' : 'Send reset link'}
+        </AuthSubmit>
+        <Link className="tf-auth-secondary" to="/login">
+          Back to login
+        </Link>
+
         <p className="tf-auth-meta">Reset links expire after 15 minutes and work only once.</p>
       </form>
-    </section>
+    </AuthLayout>
   );
 }
 
@@ -1258,71 +1444,86 @@ function ResetPasswordPage({ onResetPassword }) {
   };
 
   return (
-    <section className="tf-auth-page">
-      <div className="tf-auth-copy">
-        <p className="tf-eyebrow">CHOOSE A NEW PASSWORD</p>
-        <h1>{isDone ? 'PASSWORD SET.' : 'NEW PASSWORD.'}</h1>
-        <p>
-          {isDone
-            ? 'Your password is updated and every existing session was signed out. Log in to continue.'
-            : 'Pick something you have not used elsewhere. This also signs out every other session.'}
-        </p>
-      </div>
-
-      <form className="tf-auth-card" onSubmit={handleSubmit}>
-        <h2>Reset password</h2>
-        {error && <p className="tf-form-error">{error}</p>}
+    <AuthLayout
+      eyebrow="Choose a new password"
+      lead={
+        isDone
+          ? 'Your password is updated and every existing session was signed out. Log in to continue.'
+          : 'Pick something you have not used elsewhere. This also signs out every other session.'
+      }
+      title={
+        isDone ? (
+          <>
+            Password
+            <br />
+            <em>set.</em>
+          </>
+        ) : (
+          <>
+            Set a new
+            <br />
+            <em>password.</em>
+          </>
+        )
+      }
+    >
+      <form className="tf-auth-card" noValidate onSubmit={handleSubmit}>
+        <AuthCardHead
+          subtitle={
+            isDone ? 'All other sessions were signed out.' : 'Single-use link, 15 minute window.'
+          }
+          title="Reset password"
+        />
+        {error ? (
+          <p className="tf-form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
 
         {isDone ? (
           <>
             <p className="tf-form-note">Password updated. Sign in with your new password.</p>
-            <div className="tf-form-actions">
-              <Link className="tf-button tf-button-lime small" to="/login">
-                Go to login
-              </Link>
-            </div>
+            <Link className="tf-auth-submit" to="/login">
+              <span>Go to login</span>
+            </Link>
           </>
         ) : !resetToken ? (
           <>
             <p className="tf-form-note">
               This page needs the link from your reset email. Request a new one to continue.
             </p>
-            <div className="tf-form-actions">
-              <Link className="tf-button tf-button-lime small" to="/forgot-password">
-                Request a reset link
-              </Link>
-            </div>
+            <Link className="tf-auth-submit" to="/forgot-password">
+              <span>Request a reset link</span>
+            </Link>
           </>
         ) : (
           <>
-            <Field
+            <PasswordField
               autoComplete="new-password"
               disabled={isSubmitting}
+              hint="At least 8 characters."
               label="New password"
               name="password"
-              placeholder="Minimum 8 characters"
-              type="password"
+              placeholder="Create a password"
             />
-            <Field
+            <PasswordField
               autoComplete="new-password"
               disabled={isSubmitting}
               label="Confirm password"
               name="confirmPassword"
               placeholder="Repeat your new password"
-              type="password"
             />
-            <div className="tf-form-actions">
-              <button className="tf-button tf-button-lime small" disabled={isSubmitting} type="submit">
-                {isSubmitting ? 'Saving...' : 'Set new password'}
-              </button>
-              <Link className="tf-button tf-button-white small" to="/login">
-                Cancel
-              </Link>
-            </div>
+
+            <AuthSubmit busy={isSubmitting} disabled={isSubmitting}>
+              {isSubmitting ? 'Saving' : 'Set new password'}
+            </AuthSubmit>
+            <Link className="tf-auth-secondary" to="/login">
+              Cancel
+            </Link>
           </>
         )}
       </form>
-    </section>
+    </AuthLayout>
   );
 }
 
@@ -2129,15 +2330,19 @@ function Modal({ children }) {
 function Field({ autoComplete, defaultValue, disabled = false, label, name, placeholder, type = 'text' }) {
   return (
     <label className="tf-field">
-      {label}
-      <input
-        autoComplete={autoComplete}
-        defaultValue={defaultValue}
-        disabled={disabled}
-        name={name}
-        placeholder={placeholder}
-        type={type}
-      />
+      <span className="tf-field-head">
+        <span className="tf-field-label">{label}</span>
+      </span>
+      <span className="tf-field-control">
+        <input
+          autoComplete={autoComplete}
+          defaultValue={defaultValue}
+          disabled={disabled}
+          name={name}
+          placeholder={placeholder}
+          type={type}
+        />
+      </span>
     </label>
   );
 }
