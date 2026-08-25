@@ -1133,13 +1133,13 @@ function LoginPage({ onGoogleSignIn, onLogin }) {
 
   return (
     <AuthLayout
-      eyebrow="Welcome back"
+      eyebrow="Log in to TeamFlow"
       lead="Continue with Google, or sign in with the email and password you registered."
       title={
         <>
-          Pick up where you
+          Welcome
           <br />
-          <em>left off.</em>
+          <em>back.</em>
         </>
       }
     >
@@ -1171,7 +1171,7 @@ function LoginPage({ onGoogleSignIn, onLogin }) {
         <PasswordField
           action={
             <Link className="tf-field-action" to="/forgot-password">
-              Forgot?
+              Forgot password?
             </Link>
           }
           autoComplete="current-password"
