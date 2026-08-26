@@ -25,6 +25,7 @@ serviceAccount*.json
 *serviceAccountKey*.json
 gcp-*.json
 firebase-adminsdk*.json
+teamflow-11c9e-firebase-adminsdk-fbsvc-1bca27e411.json
 
 dist/
 build/
