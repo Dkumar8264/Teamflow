@@ -907,7 +907,6 @@ button:disabled {
   max-width: 1240px;
   margin: 0 auto;
   min-height: calc(100vh - 156px);
-  height: calc(100vh - 156px);
   padding: clamp(40px, 6vh, 84px) clamp(18px, 4vw, 56px);
 }
 
@@ -996,7 +995,6 @@ button:disabled {
   padding: clamp(30px, 3vw, 40px);
   max-width: 480px;
   width: 100%;
-  max-height: calc(100vh - 156px);
 }
 
 .tf-auth-card-head {
@@ -1196,10 +1194,12 @@ button:disabled {
 
 .tf-field {
   display: grid;
-  gap: 5px;
-  margin-top: 14px;
-  font-size: 14px;
+  gap: 8px;
+  margin-top: 16px;
+  color: #111827;
+  font-size: 13px;
   font-weight: 900;
+  line-height: 1.25;
 }
 
 .tf-field-head {
@@ -1241,22 +1241,24 @@ button:disabled {
   border: 2px solid #000;
   border-radius: 12px;
   background: #fff;
-  padding: 13px 14px;
+  min-height: 48px;
+  padding: 12px 14px;
   color: #000;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 900;
   outline: none;
   transition:
     box-shadow 0.1s ease,
     border-color 0.1s ease;
 }
 
-.tf-field input::placeholder {
-  color: #94a3b8;
-  font-weight: 700;
-}
-
 .tf-field input:hover:not(:disabled) {
   border-color: #0038ff;
+}
+
+.tf-field input::placeholder {
+  color: #64748b;
+  font-weight: 750;
 }
 
 .tf-field input:focus,
@@ -1414,6 +1416,15 @@ button:disabled {
   }
 }
 
+.tf-form-actions .tf-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
 @media (max-width: 980px) {
   .tf-header {
     align-items: flex-start;
@@ -1428,12 +1439,15 @@ button:disabled {
   }
 
   .tf-auth-page {
+    max-width: 720px;
+    align-items: start;
     padding-top: 36px;
   }
 
   .tf-auth-card {
     justify-self: stretch;
     max-width: 460px;
+    width: 100%;
     box-shadow: 6px 6px 0 #000;
   }
 
@@ -1462,8 +1476,57 @@ button:disabled {
     font-size: 58px;
   }
 
+  .tf-header {
+    gap: 14px;
+    padding: 16px 18px;
+  }
+
+  .tf-auth-actions {
+    width: 100%;
+  }
+
+  .tf-auth-actions .tf-chip {
+    flex: 1 1 auto;
+    min-height: 44px;
+    text-align: center;
+  }
+
+  .tf-auth-page {
+    padding: 34px 18px 44px;
+  }
+
+  .tf-auth-copy h1 {
+    font-size: clamp(42px, 14vw, 58px);
+    line-height: 0.98;
+  }
+
+  .tf-auth-copy p:not(.tf-eyebrow) {
+    font-size: 16px;
+  }
+
+  .tf-auth-card {
+    order: -1;
+    border-radius: 18px;
+    box-shadow: 6px 6px 0 #000;
+  }
+
+  .tf-auth-card-head h2,
+  .tf-auth-card h2 {
+    font-size: 28px;
+  }
+
   .tf-auth-highlights {
     display: none;
+  }
+
+  .tf-form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .tf-form-actions .tf-button {
+    width: 100%;
+    text-align: center;
   }
 
   .tf-columns,
