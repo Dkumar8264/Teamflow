@@ -32,4 +32,4 @@ services:
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: VITE_API_URL
-        value: https://www.team-floww.in/api
+        value: https://teamflow-wdrw.onrender.com/api
