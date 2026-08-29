@@ -29,9 +29,17 @@ const loadAdmin = () => {
 // hosts that mangle multi-line env values (Render, Vercel).
 const parseServiceAccount = (raw) => {
   const trimmed = raw.trim();
-  const json = trimmed.startsWith('{')
-    ? trimmed
-    : Buffer.from(trimmed, 'base64').toString('utf8');
+  let json;
+  const isRawJSON = trimmed.startsWith('{');
+  if (isRawJSON) {
+    json = trimmed;
+  } else {
+    try {
+      json = Buffer.from(trimmed, 'base64').toString('utf8');
+    } catch (error) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT base64 decoding failed');
+    }
+  }
 
   try {
     return JSON.parse(json);
@@ -48,6 +56,7 @@ const getFirebaseApp = () => {
   const admin = loadAdmin();
 
   if (!admin) {
+    console.warn('[firebase] firebase-admin package not available');
     return null;
   }
 
@@ -59,21 +68,91 @@ const getFirebaseApp = () => {
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
 
   if (serviceAccount) {
-    cachedApp = admin.initializeApp({
-      credential: admin.credential.cert(parseServiceAccount(serviceAccount))
+    const trimmed = serviceAccount.trim();
+    const isRawJSON = trimmed.startsWith('{');
+    let decodedJson;
+    let base64Decoded = false;
+
+    try {
+      if (isRawJSON) {
+        decodedJson = trimmed;
+      } else {
+        decodedJson = Buffer.from(trimmed, 'base64').toString('utf8');
+        base64Decoded = true;
+      }
+    } catch (error) {
+      console.warn('[firebase] FIREBASE_SERVICE_ACCOUNT base64 decoding failed', { message: error.message });
+      return null;
+    }
+
+    let parsedAccount;
+    try {
+      parsedAccount = JSON.parse(decodedJson);
+    } catch (error) {
+      console.warn('[firebase] FIREBASE_SERVICE_ACCOUNT JSON parse failed', { message: error.message });
+      return null;
+    }
+
+    // Safe diagnostics: report configuration status without exposing credentials
+    console.info('[firebase] FIREBASE_SERVICE_ACCOUNT diagnostics', {
+      isConfigured: true,
+      isRawJSON,
+      base64Decoded,
+      hasType: !!parsedAccount.type,
+      hasProjectId: !!parsedAccount.project_id,
+      hasPrivateKey: !!parsedAccount.private_key,
+      hasClientEmail: !!parsedAccount.client_email,
+      projectId: parsedAccount.project_id
     });
-    console.info('[firebase] Admin SDK initialized from FIREBASE_SERVICE_ACCOUNT');
-    return cachedApp;
+
+    // Validate required fields for a service account
+    if (!parsedAccount.type || parsedAccount.type !== 'service_account') {
+      console.warn('[firebase] FIREBASE_SERVICE_ACCOUNT missing required field: type');
+      return null;
+    }
+
+    if (!parsedAccount.project_id) {
+      console.warn('[firebase] FIREBASE_SERVICE_ACCOUNT missing required field: project_id');
+      return null;
+    }
+
+    if (!parsedAccount.private_key) {
+      console.warn('[firebase] FIREBASE_SERVICE_ACCOUNT missing required field: private_key');
+      return null;
+    }
+
+    if (!parsedAccount.client_email) {
+      console.warn('[firebase] FIREBASE_SERVICE_ACCOUNT missing required field: client_email');
+      return null;
+    }
+
+    try {
+      cachedApp = admin.initializeApp({
+        credential: admin.credential.cert(parseServiceAccount(serviceAccount))
+      });
+      console.info('[firebase] Admin SDK initialized from FIREBASE_SERVICE_ACCOUNT', { projectId: parsedAccount.project_id });
+      return cachedApp;
+    } catch (error) {
+      console.error('[firebase] Admin SDK initialization failed', { message: error.message });
+      return null;
+    }
   }
 
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    cachedApp = admin.initializeApp({
-      credential: admin.credential.applicationDefault()
-    });
-    console.info('[firebase] Admin SDK initialized from GOOGLE_APPLICATION_CREDENTIALS');
-    return cachedApp;
+    console.info('[firebase] Attempting Admin SDK initialization from GOOGLE_APPLICATION_CREDENTIALS');
+    try {
+      cachedApp = admin.initializeApp({
+        credential: admin.credential.applicationDefault()
+      });
+      console.info('[firebase] Admin SDK initialized from GOOGLE_APPLICATION_CREDENTIALS');
+      return cachedApp;
+    } catch (error) {
+      console.error('[firebase] Admin SDK initialization from GOOGLE_APPLICATION_CREDENTIALS failed', { message: error.message });
+      return null;
+    }
   }
 
+  console.warn('[firebase] FIREBASE_SERVICE_ACCOUNT not configured; Google sign-in will be disabled');
   return null;
 };
 
