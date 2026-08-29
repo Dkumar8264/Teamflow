@@ -1,5 +1,5 @@
 const localApiBaseUrl = 'http://localhost:5000/api';
-const deployedApiBaseUrl = 'https://teamflow-wdrw.onrender.com/api';
+const deployedApiBaseUrl = 'https://www.team-floww.in/api';
 const isLocalApp =
   typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 

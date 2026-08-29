@@ -11,7 +11,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: CLIENT_URL
-        value: https://teamflow-dusky.vercel.app
+        value: https://www.team-floww.in,https://team-floww.in
       - key: MONGO_URI
         sync: false
       # Must be >= 32 chars of high-entropy random data. The server refuses to boot in
@@ -31,3 +31,5 @@ services:
         sync: false
       - key: FIREBASE_PROJECT_ID
         sync: false
+      - key: VITE_API_URL
+        value: https://www.team-floww.in/api
