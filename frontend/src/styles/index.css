@@ -14,11 +14,13 @@ body {
   margin: 0;
   min-width: 320px;
   background: #0038ff;
+  overflow-x: hidden;
 }
 
 button,
 input,
-a {
+a,
+select {
   font: inherit;
 }
 
@@ -28,6 +30,14 @@ button {
 
 a {
   text-decoration: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #d4ff00;
+  outline-offset: 3px;
 }
 
 button:disabled {
@@ -85,14 +95,21 @@ button:disabled {
 
 .tf-chip,
 .tf-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   border: 2px solid #000;
   border-radius: 999px;
   font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
   text-transform: uppercase;
   transition:
     transform 120ms ease,
     box-shadow 120ms ease,
     background 120ms ease;
+  white-space: nowrap;
 }
 
 .tf-chip {
@@ -202,6 +219,7 @@ button:disabled {
 .tf-column-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 14px;
 }
@@ -386,6 +404,7 @@ button:disabled {
   padding: 4px 10px;
   color: #000;
   font-weight: 950;
+  overflow-wrap: anywhere;
 }
 
 .tf-project-list {
@@ -412,6 +431,7 @@ button:disabled {
 .tf-project strong,
 .tf-task strong {
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .tf-project span,
@@ -419,6 +439,7 @@ button:disabled {
   color: #475569;
   font-size: 12px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .tf-member-list {
@@ -443,6 +464,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .tf-member button {
@@ -487,6 +509,7 @@ button:disabled {
 .tf-invite strong {
   font-size: 14px;
   font-weight: 950;
+  overflow-wrap: anywhere;
 }
 
 .tf-invite span {
@@ -494,6 +517,7 @@ button:disabled {
   color: #0038ff;
   font-size: 12px;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .tf-invite p {
@@ -540,7 +564,7 @@ button:disabled {
 
 .tf-columns {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
   gap: 14px;
   margin-top: 18px;
 }
@@ -715,6 +739,8 @@ button:disabled {
 .tf-project-row-main strong {
   font-size: 18px;
   font-weight: 950;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
   text-transform: uppercase;
 }
 
@@ -778,12 +804,14 @@ button:disabled {
   justify-content: space-between;
   border-radius: 16px;
   background: #f8fafc;
+  padding: 10px 12px;
 }
 
 .tf-project-team .tf-member small {
   color: #0038ff;
   font-size: 11px;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .tf-invite-wide {
@@ -994,6 +1022,7 @@ button:disabled {
   color: #000;
   padding: clamp(30px, 3vw, 40px);
   max-width: 480px;
+  justify-self: end;
   width: 100%;
 }
 
@@ -1087,12 +1116,14 @@ button:disabled {
   font-size: 11px;
   font-weight: 1000;
   letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-align: center;
   text-transform: uppercase;
 }
 
 .tf-auth-divider::before,
 .tf-auth-divider::after {
-  flex: 1;
+  flex: 1 1 48px;
   height: 2px;
   background: #e2e8f0;
   content: '';
@@ -1118,6 +1149,7 @@ button:disabled {
   font-size: 15px;
   font-weight: 1000;
   letter-spacing: 0.01em;
+  line-height: 1.15;
   text-align: center;
   text-transform: uppercase;
   transition:
@@ -1150,6 +1182,7 @@ button:disabled {
   color: #000;
   font-size: 13px;
   font-weight: 1000;
+  line-height: 1.15;
   text-align: center;
   text-transform: uppercase;
 }
@@ -1489,6 +1522,42 @@ button:disabled {
     flex: 1 1 auto;
     min-height: 44px;
     text-align: center;
+  }
+
+  .tf-projects-page,
+  .tf-shell,
+  .tf-dashboard-grid,
+  .tf-features {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .tf-panel,
+  .tf-board,
+  .tf-status-card,
+  .tf-modal {
+    border-radius: 18px;
+    box-shadow: 6px 6px 0 #000;
+  }
+
+  .tf-board-head,
+  .tf-projects-hero,
+  .tf-panel-head {
+    gap: 12px;
+  }
+
+  .tf-project-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tf-row-actions {
+    justify-content: flex-start;
+  }
+
+  .tf-row-actions button,
+  .tf-task-actions button,
+  .tf-task-actions select {
+    min-height: 44px;
   }
 
   .tf-auth-page {
